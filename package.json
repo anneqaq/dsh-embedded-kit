@@ -1,0 +1,101 @@
+{
+  "name": "dsh-embedded-kit",
+  "version": "0.1.0",
+  "description": "芯片与工具链中立的嵌入式固件工具包（32 工具 + 11 技能）。体积与构建：ELF / GNU ld map / Keil map 自动识别的体积分析、七后端构建、Intel HEX 与 Cortex-M 向量表校验、QSPI dummy cycle、栈深度上界。总线与协议：I²C / SPI / I²S / UART·RS-485 / RS-232·422 / LIN / 1-Wire / CAN / CAN-FD / Modbus / SMBus·PMBus。高速与无线：USB 2.0 与 SD·eMMC 带宽、LoRa 空中时间与 EU868 占空比、BLE 吞吐、链路预算。内核侧：时钟树、NVIC 优先级与中断延迟、看门狗、电源树与结温。另有引脚漏电与电平冲突、调度可行性、功耗预算、ADC 采样负载、HardFault 分诊、NVM 磨损寿命、LVGL 缓冲。所有工具区分设计值与实测值，缺数据标 pending 而不编造。",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": {
+      "default": "./lib/index.js"
+    },
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/**/*.js",
+    "integrate/**/*.mjs",
+    "skills/**/*.md",
+    "testdata/**",
+    "tools/**/*.mjs",
+    "selftest.mjs",
+    "cordis.patch.yml",
+    "COVERAGE.md",
+    "README.md"
+  ],
+  "scripts": {
+    "selftest": "node selftest.mjs",
+    "verify:size": "node tools/verify-size.mjs",
+    "verify:keil": "node tools/verify-real-map.mjs",
+    "prepack": "node selftest.mjs"
+  },
+  "engines": {
+    "node": ">=20",
+    "dsh": ">=0.1.6-alpha.1"
+  },
+  "dsh": {
+    "engines": {
+      "dsh": ">=0.1.6-alpha.1"
+    },
+    "category": "tool",
+    "displayName": "嵌入式工具包",
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "compatibility": {
+      "dsh": "^0.1.6-alpha.1",
+      "verifiedAgainst": "0.1.6-alpha.1"
+    }
+  },
+  "license": "MIT",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "embedded",
+    "firmware",
+    "mcu",
+    "arm",
+    "riscv",
+    "cortex-m",
+    "freertos",
+    "modbus",
+    "can",
+    "canfd",
+    "i2c",
+    "spi",
+    "i2s",
+    "lin",
+    "onewire",
+    "rs485",
+    "rs232",
+    "pmbus",
+    "smbus",
+    "usb",
+    "sdio",
+    "emmc",
+    "qspi",
+    "lorawan",
+    "ble",
+    "wireless",
+    "link-budget",
+    "clock-tree",
+    "nvic",
+    "interrupt-latency",
+    "watchdog",
+    "thermal",
+    "junction-temperature",
+    "power-budget",
+    "low-power",
+    "hardfault",
+    "stack-depth",
+    "firmware-image",
+    "intel-hex",
+    "keil",
+    "elf",
+    "lvgl"
+  ],
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.2",
+    "@deepseek-ai/dsh-tools": "^0.1.6-alpha.1",
+    "@deepseek-ai/dsh-llm": "^0.1.6-alpha.1"
+  }
+}

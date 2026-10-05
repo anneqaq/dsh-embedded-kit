@@ -1,0 +1,51 @@
+    Total RO  Size (Code + RO Data)                  964 (   0.94kB)
+    Total RW  Size (RW Data + ZI Data)              1156 (   1.13kB)
+    Total ROM Size (Code + RO Data + RW Data)       1008 (   0.98kB)
+
+
+    Image component sizes
+
+
+      Code (inc. data)   RO Data    RW Data    ZI Data      Debug   Object Name
+
+       284         22          0          0          0     692584   main.o
+       116         10          0          4         72       1212   m0_uart_ring.o
+        64          8         12          8         16        900   rs485.o
+        36          0        392          0       1024        820   startup_m031series.o
+
+    ----------------------------------------------------------------------
+       512         40        404         44       1112     695516   Object Totals
+         0          0          0         32          0          0   (incl. Generated)
+        12          0          0          0          0          0   (incl. Padding)
+
+    ----------------------------------------------------------------------
+
+      Code (inc. data)   RO Data    RW Data    ZI Data      Debug   Library Member Name
+
+         8          4          0          0          0          0   entry2.o
+        40          0          0          0          0         60   memcpy.o
+
+    ----------------------------------------------------------------------
+        48          4          0          0          0         60   Library Totals
+
+    ----------------------------------------------------------------------
+
+      Code (inc. data)   RO Data    RW Data    ZI Data      Debug   Library Name
+
+        48          4          0          0          0         60   libc_stub.l
+
+    ----------------------------------------------------------------------
+        48          4          0          0          0         60   Library Totals
+
+    ----------------------------------------------------------------------
+
+==============================================================================
+
+
+      Code (inc. data)   RO Data    RW Data    ZI Data      Debug
+
+       560         44        404         44       1112     695576   Grand Totals
+       560         44        404         44       1112     695576   ELF Image Totals
+       560         44        404         44          0          0   ROM Totals
+
+==============================================================================

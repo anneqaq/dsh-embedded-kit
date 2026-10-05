@@ -1,0 +1,23 @@
+# 依赖
+node_modules/
+
+# 构建产物
+dist/
+*.tgz
+
+# 日志与临时文件
+*.log
+*.tmp
+*.bak
+~$*
+
+# 编辑器 / 系统
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# 本地环境（本插件不需要任何密钥，但防止误提交）
+.env
+.env.*
+*.local

@@ -1,0 +1,70 @@
+
+There are no discarded input sections
+
+Memory Configuration
+
+Name             Origin             Length             Attributes
+FLASH            0x08000000         0x00004000         xr
+RAM              0x20000000         0x00001000         xrw
+*default*        0x00000000         0xffffffff
+
+Linker script and memory map
+
+LOAD C:\Users\anneqaq\AppData\Local\Temp\cccIZbv6.o
+
+.isr_vector     0x08000000       0x20
+ *(.isr_vector)
+ .isr_vector    0x08000000       0x20 C:\Users\anneqaq\AppData\Local\Temp\cccIZbv6.o
+                0x08000000                g_vectors
+
+.text           0x08000020       0x3e
+ *(.text*)
+ .text          0x08000020       0x3e C:\Users\anneqaq\AppData\Local\Temp\cccIZbv6.o
+                0x08000020                Reset_Handler
+ *(.init*)
+ *(.fini*)
+ *(.literal*)
+ *(.srodata*)
+
+.rodata         0x08000060       0x20
+ *(.rodata*)
+ .rodata        0x08000060       0x20 C:\Users\anneqaq\AppData\Local\Temp\cccIZbv6.o
+                0x08000060                g_crc_table
+
+.data           0x20000000        0x0 load address 0x08000080
+ *(.data*)
+ .data          0x20000000        0x0 C:\Users\anneqaq\AppData\Local\Temp\cccIZbv6.o
+
+.sdata          0x20000000        0x4 load address 0x08000080
+ .sdata         0x20000000        0x4 C:\Users\anneqaq\AppData\Local\Temp\cccIZbv6.o
+                0x20000000                g_counter
+
+.bss            0x20000004       0x40 load address 0x08000084
+ *(.bss*)
+ .bss           0x20000004       0x40 C:\Users\anneqaq\AppData\Local\Temp\cccIZbv6.o
+                0x20000004                g_rx_buf
+ *(COMMON)
+
+.sbss           0x20000044        0x4 load address 0x08000084
+ .sbss          0x20000044        0x4 C:\Users\anneqaq\AppData\Local\Temp\cccIZbv6.o
+                0x20000044                g_overruns
+
+._user_heap_stack
+                0x20000048      0x200 load address 0x08000084
+                0x20000248                        . = (. + 0x200)
+ *fill*         0x20000048      0x200 
+OUTPUT(riscv.elf elf32-littleriscv)
+
+.comment        0x00000000       0x2f
+ .comment       0x00000000       0x2f C:\Users\anneqaq\AppData\Local\Temp\cccIZbv6.o
+                                 0x30 (size before relaxing)
+
+.note.GNU-stack
+                0x00000000        0x0
+ .note.GNU-stack
+                0x00000000        0x0 C:\Users\anneqaq\AppData\Local\Temp\cccIZbv6.o
+
+.riscv.attributes
+                0x00000000       0x2f
+ .riscv.attributes
+                0x00000000       0x2f C:\Users\anneqaq\AppData\Local\Temp\cccIZbv6.o

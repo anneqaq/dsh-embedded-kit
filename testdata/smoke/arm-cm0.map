@@ -1,0 +1,85 @@
+
+Allocating common symbols
+Common symbol       size              file
+
+g_overruns          0x4               C:\Users\anneqaq\AppData\Local\Temp\ccPUbArg.o
+g_rx_buf            0x40              C:\Users\anneqaq\AppData\Local\Temp\ccPUbArg.o
+
+Memory Configuration
+
+Name             Origin             Length             Attributes
+FLASH            0x08000000         0x00004000         xr
+RAM              0x20000000         0x00001000         xrw
+*default*        0x00000000         0xffffffff
+
+Linker script and memory map
+
+LOAD C:\Users\anneqaq\AppData\Local\Temp\ccPUbArg.o
+
+.isr_vector     0x08000000       0x20
+ *(.isr_vector)
+ .isr_vector    0x08000000       0x20 C:\Users\anneqaq\AppData\Local\Temp\ccPUbArg.o
+                0x08000000                g_vectors
+
+.text           0x08000020       0x30
+ *(.text*)
+ .text          0x08000020       0x30 C:\Users\anneqaq\AppData\Local\Temp\ccPUbArg.o
+                0x08000020                Reset_Handler
+ *(.init*)
+ *(.fini*)
+ *(.literal*)
+ *(.srodata*)
+
+.glue_7         0x08000050        0x0
+ .glue_7        0x08000050        0x0 linker stubs
+
+.glue_7t        0x08000050        0x0
+ .glue_7t       0x08000050        0x0 linker stubs
+
+.vfp11_veneer   0x08000050        0x0
+ .vfp11_veneer  0x08000050        0x0 linker stubs
+
+.v4_bx          0x08000050        0x0
+ .v4_bx         0x08000050        0x0 linker stubs
+
+.iplt           0x08000050        0x0
+ .iplt          0x08000050        0x0 C:\Users\anneqaq\AppData\Local\Temp\ccPUbArg.o
+
+.rodata         0x08000050       0x20
+ *(.rodata*)
+ .rodata        0x08000050       0x20 C:\Users\anneqaq\AppData\Local\Temp\ccPUbArg.o
+                0x08000050                g_crc_table
+
+.rel.dyn        0x08000070        0x0
+ .rel.iplt      0x08000070        0x0 C:\Users\anneqaq\AppData\Local\Temp\ccPUbArg.o
+
+.data           0x20000000        0x4 load address 0x08000070
+ *(.data*)
+ .data          0x20000000        0x4 C:\Users\anneqaq\AppData\Local\Temp\ccPUbArg.o
+                0x20000000                g_counter
+
+.igot.plt       0x20000004        0x0 load address 0x08000074
+ .igot.plt      0x20000004        0x0 C:\Users\anneqaq\AppData\Local\Temp\ccPUbArg.o
+
+.bss            0x20000004       0x44 load address 0x08000074
+ *(.bss*)
+ .bss           0x20000004        0x0 C:\Users\anneqaq\AppData\Local\Temp\ccPUbArg.o
+ *(COMMON)
+ COMMON         0x20000004       0x44 C:\Users\anneqaq\AppData\Local\Temp\ccPUbArg.o
+                0x20000004                g_overruns
+                0x20000008                g_rx_buf
+
+._user_heap_stack
+                0x20000048      0x200 load address 0x08000074
+                0x20000248                . = (. + 0x200)
+ *fill*         0x20000048      0x200 
+OUTPUT(arm-cm0.elf elf32-littlearm)
+
+.comment        0x00000000       0x7e
+ .comment       0x00000000       0x7e C:\Users\anneqaq\AppData\Local\Temp\ccPUbArg.o
+                                 0x7f (size before relaxing)
+
+.ARM.attributes
+                0x00000000       0x31
+ .ARM.attributes
+                0x00000000       0x31 C:\Users\anneqaq\AppData\Local\Temp\ccPUbArg.o
