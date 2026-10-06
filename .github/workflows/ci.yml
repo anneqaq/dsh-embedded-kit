@@ -1,0 +1,57 @@
+# dsh-embedded-kit CI —— 自测 + 多格式验证 + 第 3/4 批探针全量。
+#
+# 依赖关系说明：selftest 需要 `@deepseek-ai/dsh-tools` / `@deepseek-ai/dsh-llm`，
+# 由 package.json 的 devDependencies（file:./vendor/* 本地 stub）提供 ——
+# 因此每个 job 都要先 `npm install`（.npmrc 已设 legacy-peer-deps，
+# 跳过宿主环境的 peerDependencies）。
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  test:
+    name: node${{ matrix.node-version }} / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [20, 22]
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: 安装依赖（含 vendor stub）
+        run: npm install --no-audit --no-fund
+
+      - name: 语法检查（全部 lib 模块）
+        run: node --check lib/index.js
+
+      - name: 自测（332 项，不依赖 DSH 进程）
+        run: node selftest.mjs
+
+      - name: 多格式 / 多架构体积验证（含跨格式互证）
+        run: node tools/verify-size.mjs
+
+      - name: 真实 Keil map 自洽验证（包内样本）
+        run: node tools/verify-real-map.mjs
+
+      - name: 第 3/4 批模块探针（canfd / pmbus / usb / sdio / lora / ble / linkbudget）
+        run: |
+          node probe/canfd.probe.mjs
+          node probe/pmbus.probe.mjs
+          node probe/usb.probe.mjs
+          node probe/sdio.probe.mjs
+          node probe/lora.probe.mjs
+          node probe/ble.probe.mjs
+          node probe/linkbudget.probe.mjs
+        shell: bash
+
+      - name: npm pack 演练（验证 prepack 钩子与打包清单）
+        run: npm pack --dry-run

@@ -225,6 +225,7 @@
 | 第 2 批 | 时钟树（`clock_tree`）、NVIC 优先级与延迟（`nvic_priority`）、看门狗（`watchdog_check`）、电源树与结温（`power_tree`） | ✅ |
 | 第 3 批 | CAN-FD（`canfd_timing`）、PMBus（`pmbus_check`）、USB 2.0（`usb_bandwidth`）、SDIO（`sdio_speed`） | ✅ |
 | 第 4 批 | LoRa（`lora_airtime`）、BLE（`ble_throughput`）、链路预算（`link_budget`） | ✅ |
+| 整改批（2026-10-06） | 全面审查后的修复：7 个实测缺陷（image.js 大固件 spread 崩溃 / usb bitTimeNs 恒 NaN / leakage 无源电阻误判短路 / watchdog 窗口下限语义 / power current_ua 静默 NaN / ble latency off-by-one / canfd IDE 位缺失）；build/keil 子进程树管理与探测断层；elf/gnumap/modbus 边界校验；verify 脚本可移植化；vendor stub 使 selftest 脱离 dsh 环境可跑；新增 CI（.github/workflows/ci.yml） | ✅ |
 
 第 3/4 批由 7 个子代理并行产出（模块在 `lib/`，工具描述符与用例在 `integrate/`），
 主代理单点集成。**并行产出的代价是要复核**：集成时确实抓出了 3 个真实 bug（见下）。

@@ -1,0 +1,12 @@
+{
+  "name": "@deepseek-ai/dsh-llm",
+  "version": "0.0.0-local-stub",
+  "description": "本地开发 stub：仅用于让 selftest / CI 在未挂进 dsh profile 的干净 checkout 上可运行。生产安装时由宿主 profile 的 node_modules 提供真实实现。",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": {
+      "default": "./index.js"
+    }
+  }
+}

@@ -328,8 +328,9 @@ function bandwidthBulk(ctx) {
 	const tx = transactionBits({ speed, transferType: 'bulk', direction, payloadBytes: maxPacketBytes, gapBits, notes })
 
 	// 一个 (微)帧里装得下多少次该事务：`busTimeNs` 是 ns，所以可用时间要换算成 ns 再除。
-	// （lib 的 `maxTransactionsInInterval` 把 µs 的预算直接除以 ns 的事务时间，单位对不上、
-	//   结果恒为 0，因此这里不走它；除法的口径与 probe/usb.probe.mjs 的基准完全一致。）
+	// （lib 的 `maxTransactionsInInterval` 早期版本把 µs 的预算直接除以 ns 的事务时间、
+	//   结果恒为 0 —— 该 bug 已在 lib 侧修复（统一到 µs 口径）；此处保留 ns 口径除法，
+	//   与 probe/usb.probe.mjs 的基准完全一致，两边数值等价。）
 	const countIn = (availableUsValue) => Math.floor((availableUsValue * 1000) / tx.busTimeNs)
 
 	// 只扣 SOF：这一段是"规范第 5 章参考表"的口径，用来对照模型有没有走偏。
@@ -896,11 +897,13 @@ export const MAPPED_SYMBOLS = {
 }
 
 /**
- * 本工具**刻意没有用**的 lib 导出。
+ * 本工具**没有直接调用**的 lib 导出（历史登记）。
  *
- * `maxTransactionsInInterval` 把 µs 口径的 `availableUs` 直接除以 ns 口径的
- * `totalBits × (1e9 / bitRateHz)`，单位对不上，`maxTransactions` 恒为 0；
- * 本工具改用等价的 `floor(availableUs × 1000 / busTimeNs)`（口径与 probe 的基准一致）。
- * 这是 lib 的既有行为，本文件**不改动它**，只在此登记，免得后来人以为漏用了。
+ * `maxTransactionsInInterval` 早期版本存在单位混用（µs 预算 ÷ ns 事务时间，结果恒为 0），
+ * 该 bug 已在 lib 侧修复为统一 µs 口径，函数本身已可用。本工具仍保留自己的 ns 口径
+ * 除法（`floor(availableUs × 1000 / busTimeNs)`），与 probe 的基准口径完全一致、数值等价，
+ * 因此未改走 lib 函数 —— 只在此登记，免得后来人以为漏用了。
  */
-export const UNUSED_BY_DESIGN = { maxTransactionsInInterval: '单位不匹配（µs ÷ ns），结果恒为 0；改用等价的 ns 口径除法' }
+export const UNUSED_BY_DESIGN = {
+	maxTransactionsInInterval: 'lib 侧单位 bug 已修复；本工具保留等价的 ns 口径实现（与 probe 基准一致），未改走 lib 函数',
+}

@@ -180,8 +180,8 @@ export function register({ test, assert }) {
 
 		// FD 帧的动态填充止于数据场结束，其区域位数应与 frameLayout 报告的一致
 		const layout = frameLayout({ dlc: 15 })
-		assert.equal(layout.totals.stuffingRegionBits, 533) // SOF+ID+RRS+IDE+FDF+res+BRS+ESI+DLC(4)+Data(512)
-		assert.equal(layout.totals.worstCaseStuffBits, dynamicStuffBitsWorstCase(533))
+		assert.equal(layout.totals.stuffingRegionBits, 534) // SOF+ID+RRS+IDE+FDF+res+BRS+ESI+DLC(4)+Data(512) = 1+11+1+1+1+1+1+1+4+512（逐项独立求和，非抄实现输出）
+		assert.equal(layout.totals.worstCaseStuffBits, dynamicStuffBitsWorstCase(534))
 	})
 
 	test('FD 帧结构：标准格式固定开销 67 位、扩展格式 86 位（CRC21 口径，不含数据场）', () => {

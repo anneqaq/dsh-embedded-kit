@@ -170,8 +170,11 @@ config:
 
 ### 前置依赖
 
-插件的裸导入（`@deepseek-ai/dsh-tools`）由 Node 从插件目录向上查找解析，因此
-**插件放在 `my-DSH/plugins/` 下即可命中 `my-DSH/node_modules/@deepseek-ai/`**。
+**运行（生产）**：插件的裸导入（`@deepseek-ai/dsh-tools`）由 Node 从插件目录向上查找解析，
+因此**插件放在 `my-DSH/plugins/` 下即可命中 `my-DSH/node_modules/@deepseek-ai/`**。
+
+**自测/CI（开发）**：`npm install` 会按 devDependencies 装入 `vendor/` 下的本地 stub
+（`file:./vendor/dsh-tools`、`file:./vendor/dsh-llm`），无需真实 dsh 环境。
 
 ---
 
@@ -198,15 +201,20 @@ Cordis 的 `inject` 是硬依赖，一旦声明 `skills` 而当前 profile 没�
 
 ## 验证（已测量）
 
-三个脚本全部通过。**总计 313 项自测 + 0 失败的多格式验证**。
+三个脚本全部通过。**总计 332 项自测 + 0 失败的多格式验证**。
 
-### 自测：313 项全通过
+### 自测：332 项全通过
 
 ```bash
+npm install        # 首次需要：装 vendor/ 下的 @deepseek-ai/dsh-tools / dsh-llm 本地 stub
 node selftest.mjs
 ```
 
-不依赖 DSH 进程。其中三条最关键：
+> stub 只提供最小形状（`defineTool` / `createUserMessage`），让自测在**未挂进 dsh profile
+> 的干净 checkout（含 CI）**上也能跑；生产安装（`dsh plugin add`）不装 devDependencies，
+> 裸导入由宿主 profile 的 node_modules 提供真实实现，与本 stub 无关。
+
+不依赖 DSH 进程。其中最关键的几条：
 - **`apply()` 真的被调用**（假 ctx）→ 32 个工具的 `defineTool` schema 合法性被真实验证
 - **`import '@deepseek-ai/dsh-tools'` 真的执行** → 裸导入解析路径被真实验证
 - **`fw_size` 对同一文件按 ELF 与按 Keil map 各跑一次** → 自动识别与格式切换被真实验证

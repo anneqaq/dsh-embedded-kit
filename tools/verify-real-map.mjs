@@ -1,24 +1,24 @@
 /**
  * 真实 `.map` 交叉验证脚本。
  *
- * 拿本机真实 Keil 工程产出的 `.map` 跑一遍解析，检查：
+ * 拿真实 Keil 工程产出的 `.map` 跑一遍解析，检查：
  *   - 能否识别列格式
  *   - 逐项求和得到的 ROM/RAM 是否与 Keil 自己的 `Total` 行一致
  *     （不一致就说明列语义判错了，这是本解析器的核心正确性判据）
  *
  * 用法：node tools/verify-real-map.mjs <map1> [map2] ...
- * 未传参数时使用内置的本机样本清单。
+ * 未传参数时使用包内样本（testdata/ 下）。历史版本曾默认扫某台机器上的私有
+ * 绝对路径（其他机器上会全部静默跳过、验证覆盖名存实亡），已改为随包分发。
  */
 
 import { readFile } from 'node:fs/promises'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { parseKeilMap, buildSizeReport } from '../lib/mapfile.js'
 import { decodeLog } from '../lib/keil.js'
 
-const DEFAULT_MAPS = [
-	'C:\\Users\\anneqaq\\Documents\\Car_Encoder.map',
-	'C:\\Users\\anneqaq\\Desktop\\HAL_F103Balance\\Rang finder - 2\\MDK-ARM\\Timr\\Timr.map',
-	'C:\\Users\\anneqaq\\Documents\\Tencent Files\\1696789950\\FileRecv\\6.Encoder\\MDK-ARM\\OLED\\OLED.map',
-]
+const HERE = dirname(fileURLToPath(import.meta.url))
+const DEFAULT_MAPS = [join(HERE, '..', 'testdata', 'sample-keil.map')]
 
 const targets = process.argv.slice(2)
 const maps = targets.length > 0 ? targets : DEFAULT_MAPS
@@ -27,10 +27,11 @@ let anyFail = false
 
 for (const mapPath of maps) {
 	let text
+	let encoding = 'unknown'
 	try {
 		const decoded = decodeLog(await readFile(mapPath))
 		text = decoded.text
-		var encoding = decoded.encoding
+		encoding = decoded.encoding
 	} catch (error) {
 		console.log(`跳过（读不到）：${mapPath}`)
 		console.log(`  ${error instanceof Error ? error.message : String(error)}`)

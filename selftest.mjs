@@ -192,6 +192,15 @@ test('总量不自洽时会发出交叉验证警告（不会静默采信）', ()
 		`应发出交叉验证警告，实际警告：${report.warnings.join(' | ')}`,
 	)
 })
+test('互等断言：sizereport 与 mapfile 的 ROM/RAM footprint 公式单源一致', () => {
+	// sizereport.normalizeKeil 现在复用 mapfile.componentFootprint（此前两份独立实现无互等保证）。
+	const normalized = sizereportMod.normalizeKeil(parsed)
+	for (const [i, c] of parsed.components.entries()) {
+		const fp = mapfile.componentFootprint(c)
+		assert.equal(normalized.components[i].rom, fp.rom, `成分 ${c.object} 的 ROM 不一致`)
+		assert.equal(normalized.components[i].ram, fp.ram, `成分 ${c.object} 的 RAM 不一致`)
+	}
+})
 
 console.log('\n== 4. RS-485 时序 ==')
 test('9600 / 8N1：10 位每字符，字符时间 1041.667µs', () => {
@@ -223,12 +232,19 @@ test('未提供收发器参数时列入 pending，且不编造数值', () => {
 	assert.equal(r.turnaround.driverDisableUs, 0)
 	assert.equal(r.pending.length, 2)
 })
-test('提供收发器参数后合成切换窗口并判断是否落在 t3.5 内', () => {
+test('提供收发器参数后合成切换窗口；关闭耗时是否装得进 t3.5 静默', () => {
 	const r = rs485.analyzeTiming({ baud: 9600, driverEnableNs: 500, driverDisableNs: 500 })
 	closeTo(r.turnaround.driverEnableUs, 0.5, 1e-9)
 	closeTo(r.turnaround.busOccupancyUs, 8334.333, 0.01)
-	assert.equal(r.turnaround.fitsInT35, false)
+	// 语义修正后的判定：关闭 0.5µs ≪ t3.5 3645.8µs → 装得进（旧实现的
+	// fitsInT35 拿整帧占用 8334µs 比 t3.5 属概念错误 —— 帧时间本可远大于帧间静默）。
+	assert.equal(r.turnaround.disableFitsInSilence, true)
+	assert.equal(r.turnaround.leadTimeNeededUs, 0.5)
 	assert.equal(r.pending.length, 0)
+})
+test('驱动关闭慢于 t3.5 时 disableFitsInSilence 为 false（会吃掉帧间静默）', () => {
+	const r = rs485.analyzeTiming({ baud: 115200, driverDisableNs: 2000 * 1000 })
+	assert.equal(r.turnaround.disableFitsInSilence, false)
 })
 
 console.log('\n== 5. 技能文件加载 ==')
@@ -270,6 +286,25 @@ test('校验值可按低/高字节先两种顺序上线', () => {
 })
 test('未知预设名会报错并列出可用项', () => {
 	assert.throws(() => crcMod.computePreset(check123, 'nope'), /未知校验预设/)
+})
+test('互等断言：modbus.crc16Modbus 特化实现 ≡ crc.js 参数化预设（任意一侧改动必须同步）', () => {
+	// 两套实现（modbus.js 右移 0xA001 特化 vs crc.js 参数化引擎）数学上应等价；
+	// 此前没有断言保证持续互等，任一侧改动只能靠各自向量单独发现。
+	const samples = [
+		check123,
+		[0x01, 0x03, 0x00, 0x00, 0x00, 0x0a],
+		[],
+		[0x00],
+		[0xff, 0xff, 0xff],
+		Array.from({ length: 64 }, (_, i) => (i * 37) & 0xff),
+	]
+	for (const s of samples) {
+		assert.equal(
+			modbus.crc16Modbus(s),
+			crcMod.computePreset(s, 'crc16-modbus'),
+			`载荷 ${JSON.stringify(s.slice(0, 8))}... 两套实现结果不一致`,
+		)
+	}
 })
 
 console.log('\n== 7. ELF 解析（ARM Cortex-M0 真实产物） ==')
@@ -578,6 +613,45 @@ test('批量分析汇总：总计与最严重度正确', () => {
 	assert.equal(rep.worstSeverity, 'high')
 	assert.equal(rep.totalEstimatedUa, 82.5, '只有第一个能算出数值')
 })
+test('推挽输出高 + 无源下拉电阻：不是短路，只报偏置电流（低严重度）', () => {
+	// 回归用例：无源电阻是限流元件不是对打的驱动器，误报"短路"会严重误导排查。
+	const r = leakMod.analyzePin({
+		pin: 'PA8',
+		mcu_mode: 'output-pushpull',
+		mcu_level: 'high',
+		external_kind: 'passive-to-gnd',
+		external_level: 'low',
+		external_r_ohm: 10000,
+		vdd: 3.3,
+	})
+	assert.equal(r.severity, 'low', '推挽高 + 下拉电阻只是持续偏置电流，不是短路')
+	assert.ok(!r.findings.some((f) => f.kind === 'pushpull-vs-pushpull'), '不得误报短路')
+	assert.ok(r.findings.some((f) => f.kind === 'output-high-into-pulldown'))
+})
+test('推挽输出低 + 无源上拉电阻：对称情况同样不误报短路', () => {
+	const r = leakMod.analyzePin({
+		pin: 'PA9',
+		mcu_mode: 'output-pushpull',
+		mcu_level: 'low',
+		external_kind: 'passive-to-vdd',
+		external_level: 'high',
+		external_r_ohm: 4700,
+		vdd: 3.3,
+	})
+	assert.ok(!r.findings.some((f) => f.kind === 'pushpull-vs-pushpull'))
+	assert.ok(r.findings.some((f) => f.kind === 'output-low-into-pullup'))
+})
+test('闭合开关与推挽对打仍是真短路（不得因修复而漏报）', () => {
+	const r = leakMod.analyzePin({
+		mcu_mode: 'output-pushpull',
+		mcu_level: 'high',
+		external_kind: 'switch-to-gnd',
+		external_level: 'low',
+		vdd: 3.3,
+	})
+	assert.equal(r.severity, 'high')
+	assert.ok(r.findings.some((f) => f.kind === 'pushpull-vs-pushpull'))
+})
 
 console.log('\n== 13. 调度可行性分析 ==')
 const schedMod = await import('./lib/sched.js')
@@ -709,6 +783,16 @@ test('占空比之和超 100% → 报警（说明输入有误）', () => {
 		],
 	})
 	assert.ok(r.warnings.some((w) => w.includes('100%')))
+})
+test('缺 current_ua → 明确报错而不是静默 NaN 污染全部输出（回归用例）', () => {
+	assert.throws(
+		() => powerMod.computePowerBudget({ modes: [{ name: 'Run', duty_percent: 100 }] }),
+		/缺少 current_ua/,
+	)
+})
+test('负电流 → 提醒（通常是笔误）而不是静默接受', () => {
+	const r = powerMod.computePowerBudget({ modes: [{ name: 'X', current_ua: -50, duty_percent: 100 }] })
+	assert.ok(r.warnings.some((w) => w.includes('负值')))
 })
 
 console.log('\n== 16. 内部上下拉电阻的范围（数据手册给 min/typ/max） ==')
@@ -1444,9 +1528,58 @@ test('Intel HEX：缺 EOF 记录会报错', () => {
 })
 
 test('Intel HEX：地址重叠会被检出', () => {
-	const dup = ':10010000214601360121470136007EFE09D2190140\n:10010000000000000000000000000000000000EF\n:00000001FF\n'
+	// 第二行必须是一条**完整合法**的记录（LL=0x10 → 16 个数据字节 + CC）。
+	// 早期版本这条用例只写了 15 个数据字节，靠旧解析器"把校验和字节吞进数据"的缺陷才碰巧触发重叠；
+	// 解析器补上记录体长度校验后，该用例数据本身就被正确拒绝了 —— 这里修正为合法记录。
+	const dup = ':10010000214601360121470136007EFE09D2190140\n:1001000000000000000000000000000000000000EF\n:00000001FF\n'
 	const r = imageMod.parseIntelHex(dup)
 	assert.ok(r.errors.some((e) => e.includes('重叠')), r.errors.join(' | '))
+})
+
+test('Intel HEX：记录体长度与 LL 不一致（含把 CC 吞进数据的老 bug 形态）会被拒绝', () => {
+	// LL=0x10 但只给 15 个数据字节 —— 旧解析器会把校验和字节当第 16 个数据字节吞掉，
+	// 现在必须显式报错而不是静默接受。
+	const short = ':10010000000000000000000000000000000000EF\n:00000001FF\n'
+	const r = imageMod.parseIntelHex(short)
+	assert.ok(r.errors.some((e) => e.includes('长度与 LL 不一致')), r.errors.join(' | '))
+	assert.equal(r.dataBytes, 0)
+})
+
+test('Intel HEX：特殊记录类型的长度不符会被拒绝', () => {
+	// type 04 要求恰好 2 个数据字节；type 05 要求 4 个。
+	const bad04 = ':0300000408FF01F1\n:00000001FF\n'
+	const r04 = imageMod.parseIntelHex(bad04)
+	assert.ok(r04.errors.some((e) => e.includes('记录类型 0x04')), r04.errors.join(' | '))
+	const bad05 = ':0200000508FFF2\n:00000001FF\n'
+	const r05 = imageMod.parseIntelHex(bad05)
+	assert.ok(r05.errors.some((e) => e.includes('记录类型 0x05')), r05.errors.join(' | '))
+})
+
+test('Intel HEX：256KB 大固件不再因 spread 参数上限崩溃（回归用例）', () => {
+	// 旧实现 `Math.min(...keys)` 受 V8 调用栈参数上限（约 1e5）约束，
+	// ≥128KB 固件（Cortex-M 最常见规格）在所有校验完成后崩溃。
+	function mkRecord(len, addr, type, data) {
+		const all = [len & 0xff, (addr >> 8) & 0xff, addr & 0xff, type, ...data]
+		const cks = (256 - (all.reduce((a, b) => a + b, 0) & 0xff)) & 0xff
+		return ':' + [...all, cks].map((b) => b.toString(16).padStart(2, '0').toUpperCase()).join('')
+	}
+	const lines = []
+	const TOTAL = 262144 // 256KB
+	const base = 0x08000000
+	for (let i = 0; i < TOTAL; i += 4096) {
+		const up = ((base + i) >>> 16) & 0xffff
+		lines.push(mkRecord(2, 0, 4, [(up >> 8) & 0xff, up & 0xff]))
+		for (let j = 0; j < 4096 && i + j < TOTAL; j += 16) {
+			const n = Math.min(16, TOTAL - (i + j))
+			lines.push(mkRecord(n, (base + i + j) & 0xffff, 0, Array.from({ length: n }, (_, k) => (i + j + k) & 0xff)))
+		}
+	}
+	lines.push(':00000001FF')
+	const r = imageMod.parseIntelHex(lines.join('\n'))
+	assert.equal(r.errors.length, 0, r.errors.join(' | '))
+	assert.equal(r.dataBytes, TOTAL)
+	assert.equal(r.minAddress, 0x08000000)
+	assert.equal(r.maxAddress, 0x08000000 + TOTAL - 1)
 })
 
 test('向量表：合法的 SP/复位向量全部通过', () => {
@@ -1639,10 +1772,36 @@ test('看门狗：最坏喂狗间隔逼近超时会报警（偶发重启的典�
 })
 
 test('看门狗：窗口下限不满足（喂太早）会报警', () => {
+	// 语义修正后的判据：worst ≤ lower → 最短间隔必然更早，必违规（保守可判定分支）。
 	const r = wdtMod.analyzeWatchdog({ timeoutUs: 100_000, worstFeedIntervalUs: 30_000, windowLowerUs: 50_000 })
 	const c = r.checks.find((x) => x.name.includes('窗口下限'))
 	assert.equal(c.pass, false)
 	assert.ok(r.warnings.some((w) => w.includes('太早')))
+})
+
+test('看门狗：窗口下限判定用最快一圈（worst 过关 ≠ 安全）', () => {
+	// 100ms 超时 / 最坏 80ms / 最快一圈 10ms / 窗口下限 20ms：
+	// 旧实现拿 worst(80ms) > lower(20ms) 判"通过"是漏报 —— 最快一圈 10ms 就喂了狗。
+	const r = wdtMod.analyzeWatchdog({
+		timeoutUs: 100_000, worstFeedIntervalUs: 80_000, bestFeedIntervalUs: 10_000, windowLowerUs: 20_000,
+	})
+	const c = r.checks.find((x) => x.name.includes('窗口下限'))
+	assert.equal(c.pass, false)
+	assert.ok(r.warnings.some((w) => w.includes('太早')))
+})
+
+test('看门狗：未给最快一圈时窗口下限如实标无法判定（pass=null）', () => {
+	const r = wdtMod.analyzeWatchdog({ timeoutUs: 100_000, worstFeedIntervalUs: 80_000, windowLowerUs: 20_000 })
+	const c = r.checks.find((x) => x.name.includes('窗口下限'))
+	assert.equal(c.pass, null)
+	assert.ok(r.notes.some((n) => n.includes('best_feed_interval_us')))
+})
+
+test('看门狗：best > worst 的矛盾输入会被拒绝', () => {
+	assert.throws(
+		() => wdtMod.analyzeWatchdog({ timeoutUs: 100_000, worstFeedIntervalUs: 10_000, bestFeedIntervalUs: 80_000 }),
+		/不能大于/,
+	)
 })
 
 test('看门狗：上电初始化超过超时会报警', () => {
@@ -1695,6 +1854,47 @@ for (const name of INTEGRATED_MODULES) {
 	}
 	await mod.register({ test, assert })
 }
+
+console.log('\n== 27. 修复回归：第 3/4 批的 P0 缺陷 ==')
+test('usb.bitTimeNs：修复后返回真实位时间（旧实现恒 NaN，回归用例）', async () => {
+	const usbLib = await import('./lib/usb.js')
+	assert.ok(Math.abs(usbLib.bitTimeNs('full') - 83.33333333333333) < 1e-9, `full 实际 ${usbLib.bitTimeNs('full')}`)
+	assert.ok(Math.abs(usbLib.bitTimeNs('high') - 2.0833333333333335) < 1e-9, `high 实际 ${usbLib.bitTimeNs('high')}`)
+})
+test('usb.maxTransactionsInInterval：事务装不进窗口时钳到 0（不再产生负数）', async () => {
+	const usbLib = await import('./lib/usb.js')
+	const r = usbLib.maxTransactionsInInterval({ speed: 'full', totalBits: 100000, availableUs: 1000 })
+	assert.equal(r.maxTransactions, 0)
+})
+test('ble.maxLegalSlaveLatency：整除边界回代自检（100ms/2000ms/1 → 8，旧实现错给 9）', async () => {
+	const bleLib = await import('./lib/ble.js')
+	assert.equal(
+		bleLib.maxLegalSlaveLatency({ connIntervalMs: 100, supervisionTimeoutMs: 2000, subrateFactor: 1 }),
+		8,
+	)
+	// 非整除的常规边界保持正确。
+	assert.equal(
+		bleLib.maxLegalSlaveLatency({ connIntervalMs: 30, supervisionTimeoutMs: 2000, subrateFactor: 1 }),
+		32,
+	)
+})
+test('canfd.dynamicStuffingRegionBits：FD 标准帧补上 IDE 位（DLC15 → 534，旧实现 533）', async () => {
+	const canfdLib = await import('./lib/canfd.js')
+	assert.equal(canfdLib.dynamicStuffingRegionBits({ fd: true, extended: false, dlc: 15 }), 534)
+	assert.equal(canfdLib.dynamicStuffingRegionBits({ fd: true, extended: true, dlc: 15 }), 553)
+	// 经典帧基准不回归：98 位（SOF+仲裁+控制+数据+CRC 序列）。
+	assert.equal(canfdLib.dynamicStuffingRegionBits({ fd: false, extended: false, dlc: 8 }), 98)
+})
+test('pmbus DIRECT 负 m 系数：编码判定不再误报（halfStep 取绝对值）', async () => {
+	const toolMod = await import('./integrate/pmbus.tool.mjs')
+	// m=-4617 的厂商系数形态：编码值即使完全正确，旧实现也会因负 halfStep 误报"取整出了问题"。
+	// dispatch 主入口对负 m 系数的编码请求必须正常返回（含 checks），而不是误判失败。
+	const r = toolMod.dispatch({ action: 'linear', format: 'direct', value: 1, m: -4617, b: 0, r: 0 })
+	assert.ok(Array.isArray(r.checks))
+	const stepCheck = r.checks.find((c) => c.name.includes('格子'))
+	assert.ok(stepCheck !== undefined, '应包含编码格子判定')
+	assert.equal(stepCheck.pass, true, `负 m 系数的正确编码被误报：${stepCheck.detail}`)
+})
 
 await Promise.all(pending)
 

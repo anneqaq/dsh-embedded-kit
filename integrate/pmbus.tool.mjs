@@ -180,8 +180,10 @@ function linearVerdict({ format, direction, lib, roundTrip, inputValue, quantSte
 		})
 	} else {
 		// 编码方向唯一有意义的判定是"有没有落到最近的格子上"：误差超过半个台阶说明取整错了。
+		// 注意 DIRECT 的 m 允许为负（规范允许，厂商系数常见）—— 台阶尺寸取绝对值，
+		// 否则负 m 会让 halfStep 变负、对完全正确的编码也误报"取整出了问题"。
 		const error = lib.value - inputValue
-		const halfStep = quantStep / 2
+		const halfStep = Math.abs(quantStep) / 2
 		const withinHalfStep = Math.abs(error) <= halfStep + Math.abs(quantStep) * Number.EPSILON
 		checks.push({
 			name: '编码是否已落到最近的格子（|误差| ≤ 半个台阶）',

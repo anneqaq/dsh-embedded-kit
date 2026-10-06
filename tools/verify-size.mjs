@@ -47,12 +47,8 @@ async function analyze(path) {
 	return analyzeBuffer(buffer, decoded, { source: path, topN: 5 })
 }
 
-/** 真实 Keil 工程（本机既有，与插件无关）。 */
-const REAL_KEIL_MAPS = [
-	'C:\\Users\\anneqaq\\Documents\\Car_Encoder.map',
-	'C:\\Users\\anneqaq\\Desktop\\HAL_F103Balance\\Rang finder - 2\\MDK-ARM\\Timr\\Timr.map',
-	'C:\\Users\\anneqaq\\Documents\\Tencent Files\\1696789950\\FileRecv\\6.Encoder\\MDK-ARM\\OLED\\OLED.map',
-]
+/** Keil 样本 map（随包分发，替代历史版本里某台机器的私有绝对路径）。 */
+const REAL_KEIL_MAPS = [join(HERE, '..', 'testdata', 'sample-keil.map')]
 
 console.log('\n=== 1. 同一固件：ELF 与 GNU ld map 跨格式互证 ===')
 
@@ -155,7 +151,7 @@ for (const mapPath of REAL_KEIL_MAPS) {
 		console.log(`  跳过（读不到）${mapPath}`)
 		continue
 	}
-	const short = mapPath.split('\\').pop()
+	const short = mapPath.split(/[\\/]/).pop()
 	check(`${short} 被识别为 keil-map`, report.format === 'keil-map', `实际 ${report.format}`)
 	check(`${short} 自洽校验通过（ROM ${report.totals.rom} / RAM ${report.totals.ram}）`, report.crossCheck.passed === true)
 	check(`${short} 口径自洽（ROM = code+ro+rw）`, report.totals.rom === report.totals.code + report.totals.roData + report.totals.rwData)
