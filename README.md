@@ -16,7 +16,7 @@
 
 ## 装了什么
 
-### 工具（模型可调，共 32 个）
+### 工具（模型可调，共 31 个）
 
 #### 体积与构建
 
@@ -87,10 +87,9 @@
 | `usb_bandwidth` | USB 2.0 帧/微帧预算、周期上限与控制保留、高带宽端点、事务开销拆解 | 周期传输上限 FS 90% / HS 80%，控制保留 FS 10% / HS 20%，**批量不保留任何带宽**；包间延迟无内置实测值，退回规范下限并在 notes 里点名 |
 | `sdio_speed` | SD / SDIO / eMMC 速率档（16 档）、有效吞吐与效率归因、识别阶段限速、降档建议 | 每块固定 18 个时钟的令牌开销**每根 DAT 线各一份、与位宽无关**（位宽翻 4 倍 ≠ 吞吐翻 4 倍）；识别阶段 `f_OD ≤ 400 kHz`；偏斜/负载上限不给就**不判定** |
 | `lora_airtime` | LoRa 空中时间（Semtech 公式）+ **EU868 占空比合规**、可用发送时长与静默时间 | LDRO 在符号时长 >16 ms 时强制且收发两端必须一致（漏置位时**算出的空时偏小**）；占空比按射频实际在线时间统计，`extra_overhead_sec` 无默认值；**1 s / 100 s 那组限值属 polite spectrum access 路径，与占空比二选一，不是 EU868 通用限值** |
-| `ble_throughput` | BLE 逐层开销吞吐与瓶颈归因、广播占空比、连接参数合法性、各 PHY 对比 | 一条数据依次啃掉 ATT 3 + L2CAP 4 + LL 头 2 + MIC 4 + CRC 3 + 前导/AA + 两个 T_IFS；`encrypted / legacy / channel_count` 无默认值，缺则直接报错；**理论值比实测偏高，Coded S=8 的包时间是 1M 的 1.88 倍** |
 | `link_budget` | 自由空间路径损耗与链路闭合、最大理论距离、多频段对比 | `FSPL = 20log10(d_m) + 20log10(f_Hz) − 147.55`（常数即 `20log10(4π/c)`）；**所有损耗项与灵敏度必须由你传入**，未给的项列入"未计入"，绝不替你填；只含几何扩散，`d_max` 是**乐观上限** |
 
-### 技能（写进上下文，`/` 可调，共 11 个）
+### 技能（写进上下文，`/` 可调，共 12 个）
 
 | 技能 | 内容 |
 |---|---|
@@ -105,6 +104,7 @@
 | `architecture-principles` | 架构原则：依赖方向、模块边界（禁跨模块读写全局）、**状态单写者**、三层错误传播语义、编译期 vs 运行期配置、可观测性、资源受限下的取舍、10 条评审清单 |
 | `protocol-review` | 串行通讯协议编写与审查。帧设计、CRC 三个经典坑、超时重试、RS-485 半双工方向切换、Modbus RTU 要点 |
 | `fw-size-optimization` | 体积优化流程。先量后改，四层削减，每步复测并保留 ≥20% 余量；含 IAR / ESP-IDF / 裸 GCC 的手段对照 |
+| `ble-throughput` | BLE 吞吐 / 广播占空比 / 连接参数合法性与各 PHY 对比。**含随附脚本**（`skills/ble-throughput/scripts/run.mjs`），数值由脚本算，不靠心算；含 2120 vs 2128 µs 的已知差异与理论值偏乐观的实测倍率 |
 
 ---
 
@@ -142,7 +142,7 @@ dsh plugin --profile <profile> add dsh-embedded-kit
 
 本插件挂在 `ctx.on('agent/pre-step')` 上，在**每个会话的第一步**注入一段门禁文本，内容包括
 
-- 一张「要回答什么问题 → 用哪个工具」的对照表（32 个工具全覆盖）
+- 一张「要回答什么问题 → 用哪个工具」的对照表（31 个工具全覆盖）
 - 三条硬约束：**缺数据不许编** / **区分设计值与实测值** / **引用手册章节号前先确认它存在**
 
 目的是让模型**先算再说**，而不是凭印象口算。
@@ -162,12 +162,12 @@ config:
 ```
 
 > **已挂载实测**（dsh 0.2.0-rc.2 + 本包 0.2.0）：门禁文本正常注入会话首步，
-> 32 个工具全部注册（抽查 `proto_frame`，返回的 Modbus RTU 帧与 CRC 正确），
-> 11 个技能进入会话技能目录。
+> 31 个工具全部注册（抽查 `proto_frame`，返回的 Modbus RTU 帧与 CRC 正确），
+> 12 个技能进入会话技能目录。
 >
 > `source.kind` 必须是 producer 自己的标识（`plugin:<包名>`）——v4 明确禁止通配的
 > `plugin` kind，传它会在会话持久化时抛 `SessionFormatError`。
-> 若门禁没出现，可先 `gateEnabled: false` 关掉，不影响 32 个工具与 11 个技能。
+> 若门禁没出现，可先 `gateEnabled: false` 关掉，不影响 31 个工具与 12 个技能。
 
 ### 前置依赖
 
@@ -212,9 +212,9 @@ Cordis 的 `inject` 是硬依赖，一旦声明 `skills` 而当前 profile 没�
 
 ## 验证（已测量）
 
-三个脚本全部通过。**总计 332 项自测 + 0 失败的多格式验证**。
+三个脚本全部通过。**总计 333 项自测 + 0 失败的多格式验证**。
 
-### 自测：332 项全通过
+### 自测：333 项全通过
 
 ```bash
 npm install        # 首次需要：装 vendor/ 下的 @deepseek-ai/dsh-tools / dsh-llm 本地 stub
@@ -226,7 +226,7 @@ node selftest.mjs
 > 裸导入由宿主 profile 的 node_modules 提供真实实现，与本 stub 无关。
 
 不依赖 DSH 进程。其中最关键的几条：
-- **`apply()` 真的被调用**（假 ctx）→ 32 个工具的 `defineTool` schema 合法性被真实验证
+- **`apply()` 真的被调用**（假 ctx）→ 31 个工具的 `defineTool` schema 合法性被真实验证
 - **`import '@deepseek-ai/dsh-tools'` 真的执行** → 裸导入解析路径被真实验证
 - **`fw_size` 对同一文件按 ELF 与按 Keil map 各跑一次** → 自动识别与格式切换被真实验证
 
@@ -361,7 +361,7 @@ ARM Cortex-M0 与 RISC-V RV32 两套工具链的实测结果：`code/ro/rw/zi` *
 dsh-embedded-kit/
 ├── package.json
 ├── lib/                        # 工具与算法模块（38 个文件）
-│   ├── index.js          # 插件入口：name / inject / apply，注册 32 工具 + 11 技能
+│   ├── index.js          # 插件入口：name / inject / apply，注册 31 工具 + 12 技能
 │   ├── gate.js           # 会话启动门禁（pre-step 注入）
 │   ├── skills.js         # SKILL.md 加载与 ctx.skills 注册
 │   # 体积与构建
@@ -417,7 +417,7 @@ dsh-embedded-kit/
 ├── tools/
 │   ├── verify-size.mjs            # 多格式多架构验证（含跨格式互证）
 │   └── verify-real-map.mjs        # 真实 Keil 工程验证
-└── selftest.mjs                   # 332 项自测（不依赖 DSH）
+└── selftest.mjs                   # 333 项自测（不依赖 DSH）
 ```
 
 `testdata/smoke/` 的产物可自行重建（源码与链接脚本都在，两套工具链任一可用即可）。
