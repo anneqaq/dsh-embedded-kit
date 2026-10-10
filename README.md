@@ -135,14 +135,12 @@ dsh plugin --profile <profile> add dsh-embedded-kit
 
 之后用 `dsh --profile <profile> --dump-config` 核对是否进树。
 
-> 这个「随包 bundle patch」的做法是**借鉴 `dsh-embedded-workbench` 学来的**：
-> 它的 patch 里 `name` 写的是**包名**（`dsh-embedded-workbench`）而不是绝对路径，
-> 所以装完即生效 —— 比要求用户手写绝对路径好得多。本包的 `cordis.patch.yml` 同样如此。
+> `cordis.patch.yml` 里的 `name` 写的是**包名**而不是绝对路径，所以装完即生效 ——
+> 不需要用户手写绝对路径。
 
 ### 会话启动门禁（pre-step gate）
 
-同样借鉴自 `dsh-embedded-workbench`：本插件挂在 `ctx.on('agent/pre-step')` 上，
-在**每个会话的第一步**注入一段门禁文本，内容包括
+本插件挂在 `ctx.on('agent/pre-step')` 上，在**每个会话的第一步**注入一段门禁文本，内容包括
 
 - 一张「要回答什么问题 → 用哪个工具」的对照表（32 个工具全覆盖）
 - 三条硬约束：**缺数据不许编** / **区分设计值与实测值** / **引用手册章节号前先确认它存在**
@@ -150,7 +148,7 @@ dsh plugin --profile <profile> add dsh-embedded-kit
 目的是让模型**先算再说**，而不是凭印象口算。
 
 设计上与参考实现的两点刻意差异：
-1. **去重方式**：它扫会话历史事件（依赖会话事件 schema），我用按会话对象索引的 `WeakSet` ——
+1. **去重方式**：它扫会话历史事件（依赖会话事件 schema），本实现用按会话对象索引的 `WeakSet` ——
    少依赖一个未公开结构，行为更可预测。代价：同一会话在新进程里 resume 会再注入一次（无害）。
 2. **失败降级**：`createUserMessage` 走动态导入，拿不到就**只记日志、不注入**，
    **绝不因为一个可选依赖缺失而让整个插件挂载失败**（本包既有原则）。
@@ -164,7 +162,7 @@ config:
 ```
 
 > **诚实标注**：门禁的**处理函数契约**（追加消息、按会话去重、reject 透传）与
-> **消息形状**（`text` 内容块 + `source.plugin`）已在自测中用假 ctx 验证（122 项全过）；
+> **消息形状**（`text` 内容块 + `source.plugin`）已在自测中用假 ctx 验证；
 > 但**"在真实 dsh 会话里是否被正确消费"未验证** —— 本包尚未挂进 profile。
 > 若挂载后门禁没出现，可先 `gateEnabled: false` 关掉，不影响 32 个工具与 11 个技能。
 
@@ -244,17 +242,16 @@ node tools/verify-size.mjs
 期望值不是从解析器输出抄的，而是**由源码与链接脚本独立推算**：
 `.rodata` 16×2 + `.isr_vector` 8×4 = 64；`g_counter` = 4；`.bss` 68 + 堆栈预留 0x200 = 580。
 
-### 真实 Keil 工程：3 份全部逐字节吻合
+### Keil map 样本验证
 
 ```bash
 node tools/verify-real-map.mjs
 ```
 
-| 工程 | Keil 汇总 ROM | 逐项求和 | Keil 汇总 RW | 逐项求和 |
-|---|---|---|---|---|
-| Car_Encoder | 7500 | 7500 ✓ | 1544 | 1544 ✓ |
-| Timr | 6720 | 6720 ✓ | 1168 | 1168 ✓ |
-| OLED | 25340 | 25340 ✓ | 2160 | 2160 ✓ |
+`testdata/sample-keil.map` 含小计行、备注行与聚合视图，逐项求和与 Keil 自己打印的
+`Total RO / RW / ROM Size` 行一致（实测 RO=964 / RW=1156 / ROM=1008，8 个目标文件）。
+
+自备 `.map` 可直接传路径：`node tools/verify-real-map.mjs <map1> [map2] ...`。
 
 ### CRC 标准测试向量：9/9 通过
 
@@ -272,22 +269,13 @@ node tools/verify-real-map.mjs
 | crc8-maxim | 0xA1 |
 | crc32 | 0xCBF43926 |
 
-### 这些验证抓出过 7 个真实 bug
+### 为什么解析器要内置自洽校验
 
-**校验不是走过场。** 每一个都是被"自洽校验"或"跨格式互证"逼出来的：
+解析器的正确性靠两条：**自洽校验**（逐项求和 vs Keil 自己打印的汇总行）与**跨格式互证**
+（同一份固件分别读 ELF 与读 GNU ld map，两条独立代码路径必须给出一致的数字）。
 
-| # | 错误 | 后果 | 抓出方式 |
-|---|---|---|---|
-| 1 | Keil map 的列序判错（第 2 列不是 RO Data） | 总量算错 | 真实数据算术反解（`7036+448=7484`=Total RO） |
-| 2 | 把 `Object Totals` 等小计行当成目标文件 | ROM 虚增 8064 字节 | Keil 逐项求和 vs 官方汇总 |
-| 3 | `Library Name` 聚合视图与库成员逐项表重复计数 | ROM 虚增 282 字节 | 同上 |
-| 4 | 把 `(incl. Generated)/(incl. Padding)` 当纯备注排除 | ROM 少算 44 字节 | 同上 |
-| 5 | GNU map：段名换行的段（`._user_heap_stack`）整段漏掉 | RAM 少算 512 字节 | **跨格式互证** |
-| 6 | GNU map：`load address` 判断 ZI 不可靠（`.bss` 也有） | ROM 虚增 68 字节 | 跨格式互证 |
-| 7 | GNU map：未分配段（`.comment`/`.ARM.attributes`）被计入 | RO 虚增 126 字节 | 跨格式互证 |
-
-**这 7 个 bug 有一个共同教训**：解析器必须内置自洽校验，并且**用两种独立来源互相印证**。
-单一来源的解析器可以安静地错得很离谱，而使用者拿它做优化决策。
+单一来源的解析器可以安静地错得很离谱，而使用者拿它做优化决策 —— 所以这两条校验
+不是可选项，是解析器的一部分。
 
 ---
 
@@ -304,7 +292,7 @@ node tools/verify-real-map.mjs
 | 各节区尺寸 | `arm-none-eabi-size -A -d` | 逐节区一致（.isr_vector 32 / .text 48 / .rodata 32 / .data 4 / .bss 68 / ._user_heap_stack 512） |
 | 非分配节区排除 | 同上（.comment 126 / .ARM.attributes 49） | 正确排除，未计入运行时占用 |
 | 符号级体积排序 | `arm-none-eabi-nm --print-size --size-sort` | 符号名与尺寸**完全一致**（g_rx_buf 64 / Reset_Handler 48 / g_crc_table 32 / g_vectors 32 / g_counter 4 / g_overruns 4） |
-| Keil map 总量 | Keil 自己打印的 `Total RO/RW/ROM Size` 行 | 3 份真实工程**逐字节吻合**（7500/1544、6720/1168、25340/2160） |
+| Keil map 总量 | Keil 自己打印的 `Total RO/RW/ROM Size` 行 | 包内样本逐字节吻合（RO 964 / RW 1156 / ROM 1008） |
 | CRC 算法 | CRC 社区公认 check value（对 `"123456789"`） | 9/9 通过 |
 
 这三条是最硬的：**两个官方工具 + Keil 自己的汇总行**都印证了同一批数字。
@@ -314,8 +302,7 @@ node tools/verify-real-map.mjs
 同一份固件读 ELF（解析节区头）与读 GNU ld map（解析链接脚本输出）是**两条完全独立的代码路径**。
 ARM Cortex-M0 与 RISC-V RV32 两套工具链的实测结果：`code/ro/rw/zi` **四项明细逐字节相同**。
 
-这条判据抓出过 GNU map 侧的 3 个真 bug（段名换行漏解析、`.bss` 的 load address 误判、未分配段误计入），
-单靠 map 自身的校验一个都发现不了。
+单靠 map 自身的校验发现不了这类错误（段名换行漏解析、`.bss` 的 load address 误判、未分配段误计入等）—— 必须与 ELF 侧的结果互证。
 
 ### 第三档：**未验证**（不计入能力）
 
@@ -326,7 +313,7 @@ ARM Cortex-M0 与 RISC-V RV32 两套工具链的实测结果：`code/ro/rw/zi` *
 | armlink6 的 scatter 文件 / overlay / `--datacompressor` | 未测。这些会改变段结构与总量语义 |
 | 多镜像工程（Boot + App 各有独立 map） | 未测。逐项求和会跨镜像累加，需分别分析 |
 | 带外部存储资源的工程（外部 Flash 字模、资产） | **不在 ELF/map 里**，工具看不到，总量会低估 |
-| Xtensa（ESP32）链接 | 我的最小链接脚本放不下 Xtensa 的常量池，两个架构（ARM / RISC-V）验证了，**Xtensa 没验证** |
+| Xtensa（ESP32）链接 | 验证用最小链接脚本放不下 Xtensa 的常量池，两个架构（ARM / RISC-V）验证了，**Xtensa 没验证** |
 | 在真实 DSH 会话里跑通 | 本包按"先只交付目录"交付，未挂进 profile、未启动 dsh 实测 |
 
 ### 第四档：**已知的口径限制**（不是 bug，但会影响你怎么用）
@@ -351,8 +338,8 @@ ARM Cortex-M0 与 RISC-V RV32 两套工具链的实测结果：`code/ro/rw/zi` *
 
 ### 一句话
 
-**数字本身可以担保**（外部工具 + 双解析器互证）；**"未验证的功能"与"口径限制"我列全了**，
-按第三、四档采信即可。任何工具都不可能给你"保证没问题"—— 能给你的是"我说清楚哪里验过、哪里没验"。
+**数字本身可以担保**（外部工具 + 双解析器互证）；**"未验证的功能"与"口径限制"已列全**，
+按第三、四档采信即可。任何工具都不可能给你"保证没问题"—— 能给你的是"说清楚哪里验过、哪里没验"。
 
 ---
 
@@ -361,9 +348,9 @@ ARM Cortex-M0 与 RISC-V RV32 两套工具链的实测结果：`code/ro/rw/zi` *
 ```
 dsh-embedded-kit/
 ├── package.json
-├── lib/                        # 工具与算法模块（37 个文件）
+├── lib/                        # 工具与算法模块（38 个文件）
 │   ├── index.js          # 插件入口：name / inject / apply，注册 32 工具 + 11 技能
-│   ├── gate.js           # 会话启动门禁（pre-step 注入；借鉴 dsh-embedded-workbench）
+│   ├── gate.js           # 会话启动门禁（pre-step 注入）
 │   ├── skills.js         # SKILL.md 加载与 ctx.skills 注册
 │   # 体积与构建
 │   ├── sizereport.js     # 体积统一层：格式识别 + 归一 + 各自的自洽校验策略
@@ -371,6 +358,7 @@ dsh-embedded-kit/
 │   ├── gnumap.js         # GNU ld map 解析（GCC 系全家）
 │   ├── mapfile.js        # Keil MDK map 解析（armlink / armlink6）
 │   ├── build.js          # 七种构建后端 + 通用日志解析
+│   ├── proctree.js       # 子进程树终止（Windows taskkill /T /F；POSIX 进程组杀）
 │   ├── keil.js           # Keil 构建日志解析 + 多编码探测（GBK / UTF-8）
 │   # 总线与协议
 │   ├── crc.js            # 通用参数化 CRC 引擎 + 12 种预设
@@ -397,7 +385,7 @@ dsh-embedded-kit/
 │   ├── sched.js          # 调度可行性、节拍碰撞、抖动上界
 │   ├── fault.js          # Cortex-M 异常分诊 + 符号化地址翻译
 │   ├── lvgl.js           # LVGL 缓冲与带宽
-│   # 高速总线与无线（第 3/4 批，子代理并行产出）
+│   # 高速总线与无线
 │   ├── canfd.js          # CAN FD 两段位时序 / BRS 切换 / DLC / CRC 场
 │   ├── pmbus.js          # SMBus/PMBus 超时拉伸 / PEC / 数据格式换算
 │   ├── usb.js            # USB 2.0 帧与微帧带宽预算
@@ -405,8 +393,8 @@ dsh-embedded-kit/
 │   ├── lora.js           # LoRa 空中时间与 EU868 占空比合规
 │   ├── ble.js            # BLE 逐层吞吐 / 广播占空比 / 连接参数
 │   └── linkbudget.js     # 自由空间路径损耗与链路闭合
-├── integrate/            # 第 3/4 批工具描述符 + 用例（*.tool.mjs / *.cases.mjs）
-├── probe/                # 第 3/4 批模块的自校验探针（*.probe.mjs）
+├── integrate/            # 工具描述符 + 用例（*.tool.mjs / *.cases.mjs）
+├── probe/                # 模块自校验探针（*.probe.mjs）
 ├── cordis.patch.yml      # 随包 bundle patch（装完即生效，无需手写路径）
 ├── skills/               # 技能正文（单一真源，改这里即可；共 11 个）
 ├── testdata/
@@ -417,21 +405,9 @@ dsh-embedded-kit/
 ├── tools/
 │   ├── verify-size.mjs            # 多格式多架构验证（含跨格式互证）
 │   └── verify-real-map.mjs        # 真实 Keil 工程验证
-└── selftest.mjs                   # 313 项自测（不依赖 DSH）
+└── selftest.mjs                   # 332 项自测（不依赖 DSH）
 ```
 
 `testdata/smoke/` 的产物可自行重建（源码与链接脚本都在，两套工具链任一可用即可）。
 
 ---
-
-## 与 WorkBuddy 专家包的关系
-
-两者是**不同的扩展体系，格式不兼容**：
-
-| | WorkBuddy 专家包 | DSH 插件（本包） |
-|---|---|---|
-| 本质 | Markdown 提示词包 | npm 包 + Cordis 插件（真代码） |
-| 新增能力 | 0（纯人格注入） | 可注册模型可调工具 |
-| 清单 | `.codebuddy-plugin/plugin.json` | `package.json` 的 `dsh` 字段 |
-
-对应的专家包是 `firmware-craftsman`（花名「固件匠」），两者共用同一套技能正文。

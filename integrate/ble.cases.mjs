@@ -169,8 +169,8 @@ export function register({ test, assert: nodeAssert }) {
   })
 
   test('诚实性 ①：规范原文 2128 µs 与 HCI / 模型的 2120 µs 差 8 µs，本模块取 2120', () => {
-    // 见文件头【诚实性 ①】。这条**不是**在断言 2128 是错的，而是把差异钉住，
-    // 防止后来人把 2128 当成实现 bug 去"修"（改了就会丢掉 HCI 与 SIG 的双重支撑）。
+    // 见文件头【诚实性 ①】。这条**不是**在断言 2128 是错的，而是把差异钉住：
+    // 2128 不是实现 bug，改动它就会丢掉 HCI 与 SIG 的双重支撑。
     const modelMax = packetTimeUs({ phy: 'le-1m', payloadOctets: 255, micOctets: 0 })
     assert.equal(SPEC_PACKET_TIME_BOUNDS_US.uncoded.max, 2128, '规范 §2.1 原文写的是 2128 µs')
     assert.equal(modelMax, 2120, '逐字节模型 / HCI MaxTxTime / SIG 博客都是 2120 µs（本模块采用）')

@@ -236,8 +236,7 @@ test('提供收发器参数后合成切换窗口；关闭耗时是否装得进 t
 	const r = rs485.analyzeTiming({ baud: 9600, driverEnableNs: 500, driverDisableNs: 500 })
 	closeTo(r.turnaround.driverEnableUs, 0.5, 1e-9)
 	closeTo(r.turnaround.busOccupancyUs, 8334.333, 0.01)
-	// 语义修正后的判定：关闭 0.5µs ≪ t3.5 3645.8µs → 装得进（旧实现的
-	// fitsInT35 拿整帧占用 8334µs 比 t3.5 属概念错误 —— 帧时间本可远大于帧间静默）。
+	// 关闭 0.5µs ≪ t3.5 3645.8µs → 装得进。
 	assert.equal(r.turnaround.disableFitsInSilence, true)
 	assert.equal(r.turnaround.leadTimeNeededUs, 0.5)
 	assert.equal(r.pending.length, 0)
@@ -366,7 +365,7 @@ test('体积排序粒度是符号级（不是段级）—— 段名对优化没�
 })
 
 test('符号提取 == nm --size-sort 的实测捕获值（回归保护，非活调用）', () => {
-	// 口径说明（避免误解）：真值是我在 2026-09-18 用
+	// 口径说明（避免误解）：真值由 2026-09-18 用
 	// `arm-none-eabi-nm --print-size --size-sort --radix=d` **实际跑出来并抄进来的常量**。
 	// 本用例的作用是防止解析器日后回归，它**不会**再次调用外部工具。
 	// 另两条活验证在 tools/verify-size.mjs 与 tools/verify-real-map.mjs：
@@ -931,7 +930,6 @@ console.log('\n== 18. 会话启动门禁（借鉴 dsh-embedded-workbench 的 pre
 const gateMod = await import('./lib/gate.js')
 
 // 门禁的定位是**整套工具的使用说明**：每个工具都必须在里面被描述到。
-// 注意：我中途一度删掉过这条断言，理由是"schema 里已经有了，复述冗余"——那个理由不成立。
 // schema 讲的是参数形状；使用说明讲的是"什么场景该用它、它要什么、它给不了什么"。
 test(`门禁文本描述了全部 ${plugin.TOOL_NAMES.length} 个工具`, () => {
 	for (const name of plugin.TOOL_NAMES) {
@@ -947,8 +945,8 @@ test('门禁文本点明了硬约束（手册参数不得猜 / 设计值与实�
 })
 
 // 篇幅保护：上限**随工具数伸缩**，不写死。
-// 门禁的定位是"整套工具的使用说明"，工具多了它必然变长——写死一个数会在加工具时
-// 逼着我去砍内容（那正是之前把说明砍成清单的原因）。按每工具均摊来卡，
+// 门禁的定位是"整套工具的使用说明"，工具多了它必然变长——写死一个数，加工具时就
+// 逼着砍内容（说明曾被砍成清单就是这个原因）。按每工具均摊来卡，
 // 既能拦住"某一条描述失控膨胀"，又不会阻止覆盖完整的工具集。
 test('门禁文本篇幅随工具数伸缩（每工具均摊不超过 200 字符）', () => {
 	const n = gateMod.DEFAULT_GATE_CONTENT.length
@@ -1555,9 +1553,8 @@ test('Intel HEX：特殊记录类型的长度不符会被拒绝', () => {
 	assert.ok(r05.errors.some((e) => e.includes('记录类型 0x05')), r05.errors.join(' | '))
 })
 
-test('Intel HEX：256KB 大固件不再因 spread 参数上限崩溃（回归用例）', () => {
-	// 旧实现 `Math.min(...keys)` 受 V8 调用栈参数上限（约 1e5）约束，
-	// ≥128KB 固件（Cortex-M 最常见规格）在所有校验完成后崩溃。
+test('Intel HEX：256KB 大固件完整解析（回归用例）', () => {
+	// ≥128KB 是 Cortex-M 最常见规格，必须覆盖；最小/最大地址不能用展开运算符求。
 	function mkRecord(len, addr, type, data) {
 		const all = [len & 0xff, (addr >> 8) & 0xff, addr & 0xff, type, ...data]
 		const cks = (256 - (all.reduce((a, b) => a + b, 0) & 0xff)) & 0xff
@@ -1781,7 +1778,7 @@ test('看门狗：窗口下限不满足（喂太早）会报警', () => {
 
 test('看门狗：窗口下限判定用最快一圈（worst 过关 ≠ 安全）', () => {
 	// 100ms 超时 / 最坏 80ms / 最快一圈 10ms / 窗口下限 20ms：
-	// 旧实现拿 worst(80ms) > lower(20ms) 判"通过"是漏报 —— 最快一圈 10ms 就喂了狗。
+	// 只拿 worst(80ms) > lower(20ms) 判"通过"是漏报 —— 最快一圈 10ms 就喂了狗。
 	const r = wdtMod.analyzeWatchdog({
 		timeoutUs: 100_000, worstFeedIntervalUs: 80_000, bestFeedIntervalUs: 10_000, windowLowerUs: 20_000,
 	})
@@ -1855,18 +1852,18 @@ for (const name of INTEGRATED_MODULES) {
 	await mod.register({ test, assert })
 }
 
-console.log('\n== 27. 修复回归：第 3/4 批的 P0 缺陷 ==')
-test('usb.bitTimeNs：修复后返回真实位时间（旧实现恒 NaN，回归用例）', async () => {
+console.log('\n== 27. 关键行为的回归用例 ==')
+test('usb.bitTimeNs：返回真实位时间', async () => {
 	const usbLib = await import('./lib/usb.js')
 	assert.ok(Math.abs(usbLib.bitTimeNs('full') - 83.33333333333333) < 1e-9, `full 实际 ${usbLib.bitTimeNs('full')}`)
 	assert.ok(Math.abs(usbLib.bitTimeNs('high') - 2.0833333333333335) < 1e-9, `high 实际 ${usbLib.bitTimeNs('high')}`)
 })
-test('usb.maxTransactionsInInterval：事务装不进窗口时钳到 0（不再产生负数）', async () => {
+test('usb.maxTransactionsInInterval：事务装不进窗口时钳到 0', async () => {
 	const usbLib = await import('./lib/usb.js')
 	const r = usbLib.maxTransactionsInInterval({ speed: 'full', totalBits: 100000, availableUs: 1000 })
 	assert.equal(r.maxTransactions, 0)
 })
-test('ble.maxLegalSlaveLatency：整除边界回代自检（100ms/2000ms/1 → 8，旧实现错给 9）', async () => {
+test('ble.maxLegalSlaveLatency：整除边界回代自检（100ms/2000ms → 8）', async () => {
 	const bleLib = await import('./lib/ble.js')
 	assert.equal(
 		bleLib.maxLegalSlaveLatency({ connIntervalMs: 100, supervisionTimeoutMs: 2000, subrateFactor: 1 }),
@@ -1878,17 +1875,17 @@ test('ble.maxLegalSlaveLatency：整除边界回代自检（100ms/2000ms/1 → 8
 		32,
 	)
 })
-test('canfd.dynamicStuffingRegionBits：FD 标准帧补上 IDE 位（DLC15 → 534，旧实现 533）', async () => {
+test('canfd.dynamicStuffingRegionBits：FD 标准帧含 IDE 位（DLC15 → 534）', async () => {
 	const canfdLib = await import('./lib/canfd.js')
 	assert.equal(canfdLib.dynamicStuffingRegionBits({ fd: true, extended: false, dlc: 15 }), 534)
 	assert.equal(canfdLib.dynamicStuffingRegionBits({ fd: true, extended: true, dlc: 15 }), 553)
 	// 经典帧基准不回归：98 位（SOF+仲裁+控制+数据+CRC 序列）。
 	assert.equal(canfdLib.dynamicStuffingRegionBits({ fd: false, extended: false, dlc: 8 }), 98)
 })
-test('pmbus DIRECT 负 m 系数：编码判定不再误报（halfStep 取绝对值）', async () => {
+test('pmbus DIRECT 负 m 系数：halfStep 取绝对值', async () => {
 	const toolMod = await import('./integrate/pmbus.tool.mjs')
-	// m=-4617 的厂商系数形态：编码值即使完全正确，旧实现也会因负 halfStep 误报"取整出了问题"。
-	// dispatch 主入口对负 m 系数的编码请求必须正常返回（含 checks），而不是误判失败。
+	// m=-4617 的厂商系数形态：负 m 时 halfStep 必须取绝对值，否则编码值正确也会误报"取整出了问题"。
+	// dispatch 主入口对负 m 系数的编码请求必须正常返回（含 checks）。
 	const r = toolMod.dispatch({ action: 'linear', format: 'direct', value: 1, m: -4617, b: 0, r: 0 })
 	assert.ok(Array.isArray(r.checks))
 	const stepCheck = r.checks.find((c) => c.name.includes('格子'))

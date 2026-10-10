@@ -7,7 +7,7 @@
  *   register({ test: (label, fn) => ..., assert: nodeAssert })
  *
  * 覆盖两类东西：
- *   ① lib/canfd.js 里**联网核实过的规范基准向量**——DLC 映射表、CRC17/21 分界、
+ *   ① lib/canfd.js 里**规范基准向量**——DLC 映射表、CRC17/21 分界、
  *      CRC 场固定填充位个数（6 / 7）、BRS 位 1800 ns、stuff count 格雷码、动态填充最坏值；
  *   ② 本工具描述符（integrate/canfd.tool.mjs）的形状与参数约束；
  *   ③ 负向用例：缺关键量必须抛错点名、时钟不够必须报"无解"、未使能 TDC 必须报警。

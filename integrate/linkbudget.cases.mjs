@@ -460,7 +460,7 @@ export function register({ test, assert: nodeAssert }) {
     // 反推距离必须由调用方给发射功率与灵敏度
     assert.throws(() => dispatch({ action: 'distance', frequency_hz: 868e6, rx_sensitivity_dbm: -137 }), /需要 tx_power_dbm/)
     assert.throws(() => dispatch({ action: 'distance', frequency_hz: 868e6, tx_power_dbm: 14 }), /需要 rx_sensitivity_dbm/)
-    // 灵敏度是负值，绝不能因为"不是正数"被拦（包装层曾经踩过这个坑，这里钉住）
+    // 灵敏度是负值，绝不能因为"不是正数"被拦（这里钉住）
     assert.equal(dispatch({ action: 'distance', frequency_hz: 868e6, tx_power_dbm: -20, rx_sensitivity_dbm: -137 }).txPowerDbm, -20)
 
     // 未知 action

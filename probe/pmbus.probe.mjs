@@ -4,7 +4,7 @@
  * 直接跑：`node probe/pmbus.probe.mjs`
  *
  * 做两件事：
- *   ① 打印本模块**联网核实过的规范基准**（SMBus 超时/拉伸上限、PEC 的 CRC-8 参数与
+ *   ① 打印本模块**规范基准**（SMBus 超时/拉伸上限、PEC 的 CRC-8 参数与
  *      已知报文的 PEC 值、LINEAR11 / LINEAR16 / DIRECT 的已知换算对）并逐条断言，
  *      防止实现漂移；
  *   ② 跑几个真实用例：

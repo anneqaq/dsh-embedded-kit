@@ -15,7 +15,7 @@
  *        V4 1318.912 ms OpenELAB / haraldkreuzer.net（SF12 / BW125k / PL20，自动 LDRO）
  *      另附 SF7 侧的同源数值 56.576 ms（公开资料写作 "56.6 ms"）与 125 kHz 带宽下的 Ts 表。
  *   ② EU868 法规常数（ETSI EN 300 220-2 V3.2.2 Table 2 / Table 16）的原文数值，
- *      并保留两条**纠偏注释**（见用例 ⑤ 与 ⑥，防止后来人误用）；
+ *      并对限值归属给出说明（见用例 ⑤ 与 ⑥，防误用）；
  *   ③ 三个动作的行为：占空比预算与判定、SF 对比的单调性、法规参数可由调用方整体覆盖；
  *   ④ 负向用例：占空比超限、非法参数（含单位防呆与不臆造阈值）。
  *
@@ -227,10 +227,10 @@ export function register({ test, assert: nodeAssert }) {
     assert.ok(symbolTimeSec(11, 125000) > LDRO_SYMBOL_TIME_LIMIT_SEC)
   })
 
-  /* ── ② EU868 法规常数与两条纠偏 ─────────────────────────────── */
+  /* ── ② EU868 法规常数 ─────────────────────────────── */
 
-  test('纠偏①：1 s / 100 s / 100 ms 那组限值属于 polite spectrum access 路径（与占空比二选一），不是 EU868 通用限值', () => {
-    // 【纠偏保留 —— 防后来人误用】
+  test('1 s / 100 s / 100 ms 那组限值属于 polite spectrum access 路径（与占空比二选一），不是 EU868 通用限值', () => {
+    // 【防误用】
     //   ETSI EN 300 220-2 V3.2.2 **Table 16** 的这组时限：
     //       Maximum Transmission Duration Ton  ≤ 1 s   （For a single transmission）
     //       Maximum Transmission Duration Ton  ≤ 4 s   （For a transmission dialogue / polling sequence）
@@ -275,8 +275,8 @@ export function register({ test, assert: nodeAssert }) {
     assert.ok(badPsa.warnings.some((w) => w.includes('没有')), 'K0 段走 psa 必须被告警')
   })
 
-  test('纠偏②：Ton/Toff 在 Table 2 里对 K/L/M/N/O/P/Q 不适用，故 lib 未填任何默认值', () => {
-    // 【纠偏保留 —— 防后来人误用】
+  test('Ton/Toff 在 Table 2 里对 K/L/M/N/O/P/Q 不适用，故 lib 未填任何默认值', () => {
+    // 【防误用】
     //   EN 300 220-2 §4.4.12（短时行为 Ton/Toff）的适用条件是 "when Ton or Toff limits are
     //   specified in NRI"，§4.4.12.3 又说限值 "as specified in Table 2 or in NRI"。
     //   而 **Table 2 对 868 MHz 的 K/L/M/N/O/P/Q 各段根本没有给出 Ton/Toff**。

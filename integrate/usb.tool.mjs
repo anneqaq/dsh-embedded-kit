@@ -895,15 +895,3 @@ export const MAPPED_SYMBOLS = {
 	helpers: [frameBudget, packetBits, parseWMaxPacketSize],
 	constants: [MAX_PACKET_SIZE, INTER_PACKET_GAP_BITS, MIN_GAP_BITS_BY_SPEED, SPEC_THROUGHPUT_REFERENCE, USB_SPEEDS],
 }
-
-/**
- * 本工具**没有直接调用**的 lib 导出（历史登记）。
- *
- * `maxTransactionsInInterval` 早期版本存在单位混用（µs 预算 ÷ ns 事务时间，结果恒为 0），
- * 该 bug 已在 lib 侧修复为统一 µs 口径，函数本身已可用。本工具仍保留自己的 ns 口径
- * 除法（`floor(availableUs × 1000 / busTimeNs)`），与 probe 的基准口径完全一致、数值等价，
- * 因此未改走 lib 函数 —— 只在此登记，免得后来人以为漏用了。
- */
-export const UNUSED_BY_DESIGN = {
-	maxTransactionsInInterval: 'lib 侧单位 bug 已修复；本工具保留等价的 ns 口径实现（与 probe 基准一致），未改走 lib 函数',
-}

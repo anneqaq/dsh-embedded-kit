@@ -7,7 +7,7 @@
  *   register({ test: (label, fn) => ..., assert: nodeAssert })
  *
  * 覆盖三类东西：
- *   ① lib/pmbus.js 里**联网核实过的规范基准向量**——两个厂商的 PEC 已知报文
+ *   ① lib/pmbus.js 里**规范基准向量**——两个厂商的 PEC 已知报文
  *      （bq2084 的 0xE8、TI E2E 的 0x64）、LINEAR11 / LINEAR16 / DIRECT 的已知换算对、
  *      SMBus 的 25 / 35 ms 两条判定线；
  *   ② 工具描述符（integrate/pmbus.tool.mjs）的形状与参数约束；

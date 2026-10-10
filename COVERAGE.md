@@ -217,24 +217,3 @@
 | E 软件运行时 | 7（技能） | 0 | 4 | 0 |
 | F 合规认证 | 0 | 0 | 4 | 6 |
 
-## 推进记录
-
-| 批次 | 内容 | 状态 |
-|---|---|---|
-| 第 1 批 | 固件镜像校验（`fw_image`）、Bootloader 向量校验、QSPI dummy cycle（`qspi_flash`）、栈深度（`stack_depth`） | ✅ |
-| 第 2 批 | 时钟树（`clock_tree`）、NVIC 优先级与延迟（`nvic_priority`）、看门狗（`watchdog_check`）、电源树与结温（`power_tree`） | ✅ |
-| 第 3 批 | CAN-FD（`canfd_timing`）、PMBus（`pmbus_check`）、USB 2.0（`usb_bandwidth`）、SDIO（`sdio_speed`） | ✅ |
-| 第 4 批 | LoRa（`lora_airtime`）、BLE（`ble_throughput`）、链路预算（`link_budget`） | ✅ |
-| 整改批（2026-10-06） | 全面审查后的修复：7 个实测缺陷（image.js 大固件 spread 崩溃 / usb bitTimeNs 恒 NaN / leakage 无源电阻误判短路 / watchdog 窗口下限语义 / power current_ua 静默 NaN / ble latency off-by-one / canfd IDE 位缺失）；build/keil 子进程树管理与探测断层；elf/gnumap/modbus 边界校验；verify 脚本可移植化；vendor stub 使 selftest 脱离 dsh 环境可跑；新增 CI（.github/workflows/ci.yml） | ✅ |
-
-第 3/4 批由 7 个子代理并行产出（模块在 `lib/`，工具描述符与用例在 `integrate/`），
-主代理单点集成。**并行产出的代价是要复核**：集成时确实抓出了 3 个真实 bug（见下）。
-
-### 并行产出后修掉的 bug（复核抓出来的）
-
-| 位置 | 问题 | 修法 |
-|---|---|---|
-| `lib/canfd.js` `dynamicStuffingRegionBits` | 经典 CAN 控制场少算 1 位（漏 r0）→ 标准帧 8 字节得 97，正确是 **98** | 补上该位；扩展帧同时核对为 118 |
-| `lib/usb.js` `maxTransactionsInInterval` | `bitTime` 是**纳秒**却当微秒用，`µs ÷ ns` 使 `maxTransactions` 恒为 0 | 统一到 µs（`1e6 / bitRateHz`） |
-| `lib/ble.js` 瓶颈提示 | 判 `packetsByStackCap === undefined`，而该字段未给时是 `null` → 整条提示永不出现（死分支） | 改 `== null` |
-| `integrate/lora.tool.mjs` | `subband_override` 用 `type: 'object'` 但未声明 `additionalProperties`，被 DSH schema 校验拒绝并**中断整个 `apply()`**（连带 11 个技能都没注册） | 补齐 `additionalProperties: false` 与 `properties` |
