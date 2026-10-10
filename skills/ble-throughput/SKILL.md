@@ -9,13 +9,13 @@ whenToUse: 需要算 BLE 吞吐上限、判断连接参数是否合法、估广�
 **本技能自带可执行脚本**，不要手算——公式有多层取整与条件分支，手算必错。
 
 ```bash
-node {{PLUGIN_ROOT}}/skills/ble-throughput/scripts/run.mjs action=phy encrypted=false
+node {{PLUGIN_ROOT}}/skills/_shared/run-tool.mjs ble_throughput action=phy encrypted=false
 ```
 
 入参用 **`key=value`**（首选）。PowerShell 会吃掉命令行里的双引号，所以**不要**直接传 JSON 字符串；参数复杂（嵌套数组/对象）时把 JSON 写进文件再传路径：
 
 ```bash
-node {{PLUGIN_ROOT}}/skills/ble-throughput/scripts/run.mjs args.json
+node {{PLUGIN_ROOT}}/skills/_shared/run-tool.mjs ble_throughput args.json
 ```
 
 脚本接受一个参数对象，返回该动作的完整结果（含 `checks` / `warnings` / `notes`）。
