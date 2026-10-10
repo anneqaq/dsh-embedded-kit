@@ -16,7 +16,9 @@
 
 ## 装了什么
 
-### 工具（模型可调，共 23 个）
+### 工具（模型可调，共 8 个）
+
+只保留两类：**模型物理上做不到的**（解析 ELF / map / Intel HEX、执行构建、用 ELF 符号表翻译地址）与**高频且错一位就翻盘的**（CRC、位时序枚举、PLL 搜索）。
 
 #### 体积与构建
 
@@ -30,53 +32,31 @@
 | 工具 | 作用 | 关键点 |
 |---|---|---|
 | `proto_frame` | 协议帧。`build` 构建 Modbus RTU 帧 / `verify` 审查帧（Modbus 会翻译功能码与异常码）/ `crc` 算**通用参数化 CRC** | CRC 引擎参数化（width/poly/init/refin/refout/xorout），内置 12 种预设 + 可传自定义参数，不限于 Modbus |
-| `rs485_timing` | 位与字符时间、发送耗时、Modbus 的 t1.5 / t3.5、DE/RE 方向切换窗口 | 收发器参数**必须查数据手册**，未给则列入 `pending` 且按 0 计入 |
-| `i2c_bus` | I²C / SMBus 上拉电阻区间与可行性：`Rp(min)`（灌电流）与 `Rp(max)`（上升时间，可叠加漏电流约束），并判定总线电容是否超规范上限、区间是否为空 | `Rp(min)=(VDD−VOL)/IOL`、`tr=0.8473×Rp×Cb`；**总线电容是硬约束不是"尽量小"**；给了实际上拉值反算上升时间。公式出自 NXP UM10204 |
-| `spi_bus` | SPI 模式边沿语义 + 一阶模型估最高 SCK + 吞吐预算 | 把 CPOL/CPHA 翻成"哪个边沿采样、哪个边沿移出"是**确定的定义**（非估计）；`tV/tSU` 必须查各自手册，最高时钟只是一阶估计，最终看波形 |
-| `i2s_clk` | I²S / TDM 的 LRCK / BCLK / MCLK 整除性 | 全是确定算术；**MCLK 不是 fs 整数倍会引入周期性采样点漂移，主时钟分不出 BCLK 则根本跑不起来** |
 | `can_timing` | CAN 位时序反算（BRP / TSEG1 / TSEG2 / SJW + 寄存器编程值=功能值−1） | 一并给出采样点、振荡器容差 df（Bosch/CiA 两条约束取小）、传播段可覆盖的最大单向延迟；排序以采样点接近 **87.5%** 优先，不是单纯取容差最大 |
-| `lin_sched` | LIN 帧时间与调度表可行性 | 固定 34 位帧头（break 13 + 分隔符 1 + sync 10 + PID 10）；规范最小槽位 = 帧时间 **×1.4 裕量**；判定槽位合计是否装得进周期。常量出自 LIN 规范 |
-| `onewire_timing` | 1-Wire **标准速率**时隙窗口校验（时隙/写 1/写 0/读时隙/恢复时间逐项） | Overdrive 速率窗口**窄一个量级且各器件不同，本工具不给那组数**，请查具体器件手册。窗口出自 Maxim DS0009 |
-| `rs232_link` | RS-232(V.28) 输出幅度/门限/摆率 + 按电容折算线长；RS-422(V.11) 差分与终端匹配 | **V.28 的长度限制来自线缆电容（上限 2500 pF），不是某个固定米数**；V.11 侧查差分幅度下限与终端电阻匹配 |
+| `canfd_timing` | CAN FD 两段速率**分开**反算、BRS/CRC 界定符 mixed 位、DLC 非线性映射、CRC17/21 与固定填充位 | **FD 的 DLC 9~15 是非线性映射**（12/16/20/24/32/48/64），只有 16 种合法载荷长度，10 字节这类需求**必须补齐到下一档**；数据段 >1 Mbit/s 必须使能 TDC 且 BRPD 应为 1 或 2 |
+
+#### 时钟
+
+| 工具 | 作用 | 关键点 |
+|---|---|---|
+| `clock_tree` | PLL **精确命中**的组合求解 + 分频链逐节点校验 + 串口时钟容错预算 | `fout = fsrc/inputDiv×mul/outputDiv`（整数运算）；命中不了就如实报最接近组合与误差——**该误差对 UART 可忽略、对 USB/CAN/I²S 是致命的**；VCO 区间与外设时钟上限必须查手册 |
 
 #### 镜像与启动（量产前必查）
 
 | 工具 | 作用 | 关键点 |
 |---|---|---|
 | `fw_image` | Intel HEX 逐条校验和 / 地址重叠 / 空洞 / 缺 EOF；顺带（给 Flash+RAM 范围）做 Cortex-M 向量表校验；给 `crc_preset` 再算整镜像 CRC。`action=vectors` 单独校验一组 SP/复位向量 | 向量表：SP 在 RAM 且 **8 字节对齐**、复位向量 **Thumb 位**、目标在 Flash、**VTOR 按异常数对齐**。**这两个字是上电后硬件读的第一样东西，早于任何 C 代码——错了不会有日志，只表现为"不启动"** |
-| `qspi_flash` | QSPI / OSPI dummy cycle 与频率的关系、读延迟与吞吐 | `D×tCLK ≥ tV`，即 **dummy 下限 = ceil(tV×f)**、给定 dummy 的频率上限 = D/tV；**dummy 数是频率的函数**，手册里"需要 N 个 dummy"通常带前提频率，换高时钟必须重算 |
-| `stack_depth` | 栈深度**静态上界**（最坏调用链 + 最深 N 层中断帧）+ 填充法实测步骤 + 水印反算 | 帧大小取自编译器 `-fstack-usage` 的 `.su`；**静态上界≠实测用量**，函数指针/库函数/中断时机都会额外吃栈，必须用填充法或水位寄存器复核 |
 
-#### 存储与显示
+#### 调试
 
 | 工具 | 作用 | 关键点 |
 |---|---|---|
-| `nvm_layout` | NVM/Flash 分区规划：地址范围、**重叠检测**、页与写粒度**对齐检查**、剩余空间、**擦除寿命（年）** | 磨损模型分 `page-rewrite` 与 `circular-log`，两者寿命差可达**几个数量级**（8 页环形日志≈8 倍耐久） |
-| `lvgl_mem` | LVGL 显示缓冲与带宽：整帧字节、绘制缓冲占用、满屏刷新的带宽与总线占用率 | `LV_MEM_SIZE` **无法静态计算**，工具明确说明必须用 `lv_mem_monitor()` 实测 |
-
-#### 调度与调试
-
-| 工具 | 作用 | 关键点 |
-|---|---|---|
-| `sched_analyze` | 调度可行性：CPU 占用率、节拍量化误差、**节拍碰撞扫描**、同拍最坏等待（抖动上界） | 最重一拍能否在一拍内跑完 —— 节拍驱动的生死线 |
 | `fault_decode` | Cortex-M 异常分诊：栈/模式判定、**PC/LR 翻译成「函数 + 偏移」**、CFSR/HFSR/MMFAR/BFAR 解读、按置信度排序的根因推断 | 需要 ELF 提供符号表；单看 `PC=0x08001a3c` 无意义，译成 `Reset_Handler + 0x2c` 才能定位 |
 
-#### 时钟 / 中断 / 看门狗 / 电源
+> **其余 17 项能力已改为按需加载的技能**，不再占用每轮上下文：总线时序（I²C / SPI / I²S / RS-485 / RS-232 / LIN / 1-Wire / QSPI）、功耗与电源树、引脚漏电、ADC 采样负载、NVM 寿命、LVGL 缓冲、栈深度、调度可行性、BLE / LoRa / USB / SD / PMBus、链路预算。
+> 见下节技能表 —— 每个技能正文里带**可执行脚本**的用法：`node <插件根>/skills/_shared/run-tool.mjs <工具名> key=value …`
 
-| 工具 | 作用 | 关键点 |
-|---|---|---|
-| `clock_tree` | PLL **精确命中**的组合求解 + 分频链逐节点校验 + 串口时钟容错预算 | `fout = fsrc/inputDiv×mul/outputDiv`（整数运算）；命中不了就如实报最接近组合与误差——**该误差对 UART 可忽略、对 USB/CAN/I²S 是致命的**；VCO 区间与外设时钟上限必须查手册 |
-| `nvic_priority` | NVIC 优先级分组、抢占判定、中断延迟上界 | **抢占位相同则彼此不能抢占，子优先级不产生抢占**（最常见的误判）；延迟上界 = 最长关中断窗口 + 更高优先级 ISR 之和 + 入栈开销 |
-| `watchdog_check` | 看门狗超时求解、最坏喂狗间隔区间判定、上电路径检查 | 窗口型还要求**不能喂太早**（喂早了同样复位）；判据是**最坏**喂狗间隔而非平均；**不要在中断里喂狗**——那会掩盖主循环卡死 |
-
-#### 高速总线与无线
-
-| 工具 | 作用 | 关键点 |
-|---|---|---|
-| `canfd_timing` | CAN FD 两段速率**分开**反算、BRS/CRC 界定符 mixed 位、DLC 非线性映射、CRC17/21 与固定填充位 | **FD 的 DLC 9~15 是非线性映射**（12/16/20/24/32/48/64），只有 16 种合法载荷长度，10 字节这类需求**必须补齐到下一档**；数据段 >1 Mbit/s 必须使能 TDC 且 BRPD 应为 1 或 2 |
-| `lora_airtime` | LoRa 空中时间（Semtech 公式）+ **EU868 占空比合规**、可用发送时长与静默时间 | LDRO 在符号时长 >16 ms 时强制且收发两端必须一致（漏置位时**算出的空时偏小**）；占空比按射频实际在线时间统计，`extra_overhead_sec` 无默认值；**1 s / 100 s 那组限值属 polite spectrum access 路径，与占空比二选一，不是 EU868 通用限值** |
-
-### 技能（写进上下文，`/` 可调，共 17 个）
+### 技能（写进上下文，`/` 可调，共 21 个）
 
 | 技能 | 内容 |
 |---|---|
@@ -97,6 +77,10 @@
 | `usb-bandwidth` | USB 2.0 帧/微帧预算、周期上限与控制保留、高带宽端点、事务开销拆解。含包间延迟无内置实测值、HS 的 bInterval 是 2^(n−1) 微帧、不做 SPLIT 建模会高估；`skills/_shared/run-tool.mjs usb_bandwidth …` |
 | `sdio-speed` | SD/SDIO/eMMC 速率档与有效吞吐、识别阶段限速、降档建议。含每块 18 时钟开销**每根 DAT 线各一份**、四项开销不传即按 0 计（乐观上界）、偏斜/负载上限不给就不判定；`skills/_shared/run-tool.mjs sdio_speed …` |
 | `power-and-io` | 功耗预算与电池寿命、电源树耗散与结温、引脚漏电通路与电平冲突、ADC 采样负载与源阻抗上限。含**待机漏电是硬地板**、LDO 效率与电流无关、最坏情况取手册 min 电阻、源阻抗超限会让读数偏低而非线性；`skills/_shared/run-tool.mjs power_budget \| power_tree \| leak_pin \| adc_load …` |
+| `bus-timing` | 总线与线路时序电气：I²C 上拉区间、SPI 模式与最高时钟、I²S 时钟整除、RS-485/UART 与 Modbus 静默时间、RS-232/422 电气与线长、LIN 调度表、1-Wire 时隙、QSPI dummy cycle。含每项"必须查手册/实测"的参数清单；`run-tool.mjs i2c_bus \| spi_bus \| i2s_clk \| rs485_timing \| rs232_link \| lin_sched \| onewire_timing \| qspi_flash …` |
+| `mcu-core` | NVIC 优先级分组与中断延迟上界、看门狗超时窗口与喂狗可行性、调度可行性、栈深度静态上界。含**抢占位相同则不能抢占**、窗口型喂太早同样复位、**静态上界≠实测用量**；`run-tool.mjs nvic_priority \| watchdog_check \| sched_analyze \| stack_depth …` |
+| `storage-and-display` | NVM 分区规划与擦除寿命、LVGL 缓冲与带宽。含**磨损模型选错寿命差几个数量级**、`LV_MEM_SIZE` 无法静态计算必须 `lv_mem_monitor()` 实测；`run-tool.mjs nvm_layout \| lvgl_mem …` |
+| `lora-airtime` | LoRa 空中时间（Semtech 公式 + LDRO + 显式/隐式头）与 EU868 占空比合规、各 SF 对比。含 **LDRO 收发两端必须一致**、**1 s / 100 s 属 polite spectrum access 路径与占空比二选一**、Ton/Toff 不替 868 子频段编造；`run-tool.mjs lora_airtime …` |
 
 ---
 
@@ -134,7 +118,7 @@ dsh plugin --profile <profile> add dsh-embedded-kit
 
 本插件挂在 `ctx.on('agent/pre-step')` 上，在**每个会话的第一步**注入一段门禁文本，内容包括
 
-- 一张「要回答什么问题 → 用哪个工具」的对照表（23 个工具全覆盖）
+- 一张「要回答什么问题 → 用哪个工具」的对照表（8 个工具全覆盖）
 - 三条硬约束：**缺数据不许编** / **区分设计值与实测值** / **引用手册章节号前先确认它存在**
 
 目的是让模型**先算再说**，而不是凭印象口算。
@@ -154,12 +138,12 @@ config:
 ```
 
 > **已挂载实测**（dsh 0.2.0-rc.2 + 本包 0.2.0）：门禁文本正常注入会话首步，
-> 23 个工具全部注册（抽查 `proto_frame`，返回的 Modbus RTU 帧与 CRC 正确），
-> 17 个技能进入会话技能目录。
+> 8 个工具全部注册（抽查 `proto_frame`，返回的 Modbus RTU 帧与 CRC 正确），
+> 21 个技能进入会话技能目录。
 >
 > `source.kind` 必须是 producer 自己的标识（`plugin:<包名>`）——v4 明确禁止通配的
 > `plugin` kind，传它会在会话持久化时抛 `SessionFormatError`。
-> 若门禁没出现，可先 `gateEnabled: false` 关掉，不影响 23 个工具与 17 个技能。
+> 若门禁没出现，可先 `gateEnabled: false` 关掉，不影响 8 个工具与 21 个技能。
 
 ### 前置依赖
 
@@ -204,9 +188,9 @@ Cordis 的 `inject` 是硬依赖，一旦声明 `skills` 而当前 profile 没�
 
 ## 验证（已测量）
 
-三个脚本全部通过。**总计 338 项自测 + 0 失败的多格式验证**。
+三个脚本全部通过。**总计 342 项自测 + 0 失败的多格式验证**。
 
-### 自测：338 项全通过
+### 自测：342 项全通过
 
 ```bash
 npm install        # 首次需要：装 vendor/ 下的 @deepseek-ai/dsh-tools / dsh-llm 本地 stub
@@ -218,7 +202,7 @@ node selftest.mjs
 > 裸导入由宿主 profile 的 node_modules 提供真实实现，与本 stub 无关。
 
 不依赖 DSH 进程。其中最关键的几条：
-- **`apply()` 真的被调用**（假 ctx）→ 23 个工具的 `defineTool` schema 合法性被真实验证
+- **`apply()` 真的被调用**（假 ctx）→ 8 个工具的 `defineTool` schema 合法性被真实验证
 - **`import '@deepseek-ai/dsh-tools'` 真的执行** → 裸导入解析路径被真实验证
 - **`fw_size` 对同一文件按 ELF 与按 Keil map 各跑一次** → 自动识别与格式切换被真实验证
 
@@ -353,7 +337,7 @@ ARM Cortex-M0 与 RISC-V RV32 两套工具链的实测结果：`code/ro/rw/zi` *
 dsh-embedded-kit/
 ├── package.json
 ├── lib/                        # 工具与算法模块（38 个文件）
-│   ├── index.js          # 插件入口：name / inject / apply，注册 23 工具 + 17 技能
+│   ├── index.js          # 插件入口：name / inject / apply，注册 8 工具 + 21 技能
 │   ├── gate.js           # 会话启动门禁（pre-step 注入）
 │   ├── skills.js         # SKILL.md 加载与 ctx.skills 注册
 │   # 体积与构建
@@ -409,7 +393,7 @@ dsh-embedded-kit/
 ├── tools/
 │   ├── verify-size.mjs            # 多格式多架构验证（含跨格式互证）
 │   └── verify-real-map.mjs        # 真实 Keil 工程验证
-└── selftest.mjs                   # 338 项自测（不依赖 DSH）
+└── selftest.mjs                   # 342 项自测（不依赖 DSH）
 ```
 
 `testdata/smoke/` 的产物可自行重建（源码与链接脚本都在，两套工具链任一可用即可）。

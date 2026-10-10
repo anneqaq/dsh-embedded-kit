@@ -1376,7 +1376,9 @@ test('fw_build 的 probe 动作端到端可执行', async () => {
 })
 
 test('rs485_timing 端到端可执行', async () => {
-	const tool = registeredTools.find((t) => t.name === 'rs485_timing')
+	// 该能力已从常驻工具列表移到「技能 + 脚本」，所以按名字取时先查注册表、
+	// 再查描述符工厂 —— 能力本身没变，只是不再占用每轮上下文。
+	const tool = registeredTools.find((t) => t.name === 'rs485_timing') ?? plugin.TOOL_FACTORIES.rs485_timing({})
 	const out = await tool.execute({ baud: 115200, frame_bytes: 8 }, { signal: undefined })
 	assert.equal(out.modbus.usingFixedSilence, true)
 	assert.equal(out.bitsPerChar, 10)
