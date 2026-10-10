@@ -161,11 +161,13 @@ config:
   gateContent: "自定义文本"    # 替换默认门禁文本
 ```
 
-> **诚实标注**：门禁的**处理函数契约**（追加消息、按会话去重、reject 透传）与
-> **消息形状**（`text` 内容块 + 会话格式 v4 要求的 `source.kind`）已在自测中用假 ctx 验证。
-> 注意 `source.kind` 必须是 producer 自己的标识（`plugin:<包名>`）——v4 明确禁止通配的
+> **已挂载实测**（dsh 0.2.0-rc.2 + 本包 0.2.0）：门禁文本正常注入会话首步，
+> 32 个工具全部注册（抽查 `proto_frame`，返回的 Modbus RTU 帧与 CRC 正确），
+> 11 个技能进入会话技能目录。
+>
+> `source.kind` 必须是 producer 自己的标识（`plugin:<包名>`）——v4 明确禁止通配的
 > `plugin` kind，传它会在会话持久化时抛 `SessionFormatError`。
-> 若挂载后门禁没出现，可先 `gateEnabled: false` 关掉，不影响 32 个工具与 11 个技能。
+> 若门禁没出现，可先 `gateEnabled: false` 关掉，不影响 32 个工具与 11 个技能。
 
 ### 前置依赖
 
@@ -174,6 +176,16 @@ config:
 
 **自测/CI（开发）**：`npm install` 会按 devDependencies 装入 `vendor/` 下的本地 stub
 （`file:./vendor/dsh-tools`、`file:./vendor/dsh-llm`），无需真实 dsh 环境。
+
+**兼容性判定（不满足会被静默跳过，务必看这条）**：dsh 在装载 profile 前逐个检查插件的
+`@deepseek-ai/dsh*` peerDependencies，用
+`semver.satisfies(runtimeVersion, range, { includePrerelease: true })` 判定；不满足就把
+**整行 bundle 跳过**，只在启动日志留一句 `skipping profile bundle` —— 表现为
+"装上了但没生效"，且不报错。所以 peer 范围必须覆盖你实际运行的 dsh 版本。
+本包声明 `>=0.1.6-alpha.1 <0.3.0`。宿主升出该范围时，要么同步放宽范围，
+要么在 profile 目录写 `compatibility.json` 授予精确版本豁免：
+`{"dsh-embedded-kit@<包版本>": ["<dsh 版本>"]}` —— 它按**精确版本对**生效，
+宿主升级后需重新授权。
 
 ---
 
@@ -315,7 +327,6 @@ ARM Cortex-M0 与 RISC-V RV32 两套工具链的实测结果：`code/ro/rw/zi` *
 | 多镜像工程（Boot + App 各有独立 map） | 未测。逐项求和会跨镜像累加，需分别分析 |
 | 带外部存储资源的工程（外部 Flash 字模、资产） | **不在 ELF/map 里**，工具看不到，总量会低估 |
 | Xtensa（ESP32）链接 | 验证用最小链接脚本放不下 Xtensa 的常量池，两个架构（ARM / RISC-V）验证了，**Xtensa 没验证** |
-| 在真实 DSH 会话里跑通 | 本包按"先只交付目录"交付，未挂进 profile、未启动 dsh 实测 |
 
 ### 第四档：**已知的口径限制**（不是 bug，但会影响你怎么用）
 
