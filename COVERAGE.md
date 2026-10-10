@@ -210,10 +210,9 @@
 fault_decode / proto_frame / can_timing / canfd_timing / clock_tree。）
 
 > **本表里出现的其它工具名指的是"实现"，不一定是"已注册工具"。**
-> 为了让工具列表不再每轮全量发送，多数能力已改为**按需加载的技能 + 随附脚本**：
-> 技能正文讲知识（公式、判据、坑），脚本执行计算。实现仍在 `lib/` 与 `integrate/` 下，
-> 按名字可调用（`node skills/_shared/run-tool.mjs <工具名> key=value …`），
-> 只是不再占用常驻上下文。技能与工具名的对应关系见 README 的技能表。
+> 这些能力的知识在**按需加载的技能**正文里，计算由技能随附脚本执行；实现仍在 `lib/` 与 `integrate/` 下，
+> 按名字可调用（`node skills/_shared/run-tool.mjs <工具名> key=value …`）。
+> 技能与工具名的对应关系见 README 的技能表。
 
 | 轴 | 已覆盖 | 工具候选 🔧 | 技能候选 📋 | 不适合 ⛔ |
 |---|---|---|---|---|

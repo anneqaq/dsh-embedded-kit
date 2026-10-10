@@ -52,8 +52,7 @@ node {{PLUGIN_ROOT}}/skills/_shared/run-tool.mjs rs485_timing baud=115200
 
 ## CAN 与 CAN FD
 
-`can_timing` 与 `canfd_timing` 都是**工具**（不在这条脚本入口里），因为它们属于"高频且错一位就翻盘"。
-但它们的规格口径写在这里 —— 那些细节原本挤在工具描述里，每轮都要发送。
+`can_timing` 与 `canfd_timing` 是**工具**（不在这条脚本入口里），属于"高频且错一位就翻盘"一类；规格口径记在这里。
 
 **CAN（经典）**
 

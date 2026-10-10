@@ -18,12 +18,7 @@
 
 ### 工具（模型可调，共 8 个）
 
-只保留两类：**模型物理上做不到的**（解析 ELF / map / Intel HEX、执行构建、用 ELF 符号表翻译地址）与**高频且错一位就翻盘的**（CRC、位时序枚举、PLL 搜索）。
-
-> **实测**：这 8 个工具的模型可见 schema 合计 **11,170 字符**；重构前 32 个工具是 **62,009 字符**
-> （两者同口径，均取模型实际收到的 `{name, description, parameters}` 序列化形式），**-82%**。
-> 被移出去的能力一个都没丢：实现仍在 `lib/` 与 `integrate/` 下，经 `skills/_shared/run-tool.mjs`
-> 按工具名调用，参数校验与数值与工具时代逐字节一致。
+只放两类：**模型物理上做不到的**（解析 ELF / map / Intel HEX、执行构建、用 ELF 符号表翻译地址）与**高频且错一位就翻盘的**（CRC、位时序枚举、PLL 搜索）。其余能力的实现在 `lib/` 与 `integrate/` 下，经 `skills/_shared/run-tool.mjs` 按工具名调用，见下节技能。
 
 #### 体积与构建
 
@@ -58,7 +53,7 @@
 |---|---|---|
 | `fault_decode` | Cortex-M 异常分诊：栈/模式判定、**PC/LR 翻译成「函数 + 偏移」**、CFSR/HFSR/MMFAR/BFAR 解读、按置信度排序的根因推断 | 需要 ELF 提供符号表；单看 `PC=0x08001a3c` 无意义，译成 `Reset_Handler + 0x2c` 才能定位 |
 
-> **其余 17 项能力已改为按需加载的技能**，不再占用每轮上下文：总线时序（I²C / SPI / I²S / RS-485 / RS-232 / LIN / 1-Wire / QSPI）、功耗与电源树、引脚漏电、ADC 采样负载、NVM 寿命、LVGL 缓冲、栈深度、调度可行性、BLE / LoRa / USB / SD / PMBus、链路预算。
+> 以下能力不在工具列表里，以**按需加载的技能**提供：总线时序（I²C / SPI / I²S / RS-485 / RS-232 / LIN / 1-Wire / QSPI）、功耗与电源树、引脚漏电、ADC 采样负载、NVM 寿命、LVGL 缓冲、栈深度、调度可行性、BLE / LoRa / USB / SD / PMBus、链路预算。
 > 见下节技能表 —— 每个技能正文里带**可执行脚本**的用法：`node <插件根>/skills/_shared/run-tool.mjs <工具名> key=value …`
 
 ### 技能（写进上下文，`/` 可调，共 21 个）
@@ -142,13 +137,9 @@ config:
   gateContent: "自定义文本"    # 替换默认门禁文本
 ```
 
-> **已挂载实测**（dsh 0.2.0-rc.2 + 本包 0.2.0）：门禁文本正常注入会话首步，
-> 8 个工具全部注册（抽查 `proto_frame`，返回的 Modbus RTU 帧与 CRC 正确），
-> 21 个技能进入会话技能目录。
->
 > `source.kind` 必须是 producer 自己的标识（`plugin:<包名>`）——v4 明确禁止通配的
 > `plugin` kind，传它会在会话持久化时抛 `SessionFormatError`。
-> 若门禁没出现，可先 `gateEnabled: false` 关掉，不影响 8 个工具与 21 个技能。
+> 门禁没出现时可先 `gateEnabled: false` 关掉，不影响工具与技能。
 
 ### 前置依赖
 
@@ -158,15 +149,11 @@ config:
 **自测/CI（开发）**：`npm install` 会按 devDependencies 装入 `vendor/` 下的本地 stub
 （`file:./vendor/dsh-tools`、`file:./vendor/dsh-llm`），无需真实 dsh 环境。
 
-**兼容性判定（不满足会被静默跳过，务必看这条）**：dsh 在装载 profile 前逐个检查插件的
-`@deepseek-ai/dsh*` peerDependencies，用
-`semver.satisfies(runtimeVersion, range, { includePrerelease: true })` 判定；不满足就把
-**整行 bundle 跳过**，只在启动日志留一句 `skipping profile bundle` —— 表现为
-"装上了但没生效"，且不报错。所以 peer 范围必须覆盖你实际运行的 dsh 版本。
-本包声明 `>=0.1.6-alpha.1 <0.3.0`。宿主升出该范围时，要么同步放宽范围，
-要么在 profile 目录写 `compatibility.json` 授予精确版本豁免：
-`{"dsh-embedded-kit@<包版本>": ["<dsh 版本>"]}` —— 它按**精确版本对**生效，
-宿主升级后需重新授权。
+**兼容性判定**：dsh 装载 profile 前会逐个检查插件的 `@deepseek-ai/dsh*` peerDependencies
+（`semver.satisfies(runtimeVersion, range, { includePrerelease: true })`），不满足就**整行跳过**，
+只在启动日志留一句 `skipping profile bundle` —— 表现为"装上了但没生效"，且不报错。
+本包声明 `>=0.1.6-alpha.1 <0.3.0`；宿主升出该范围时放宽范围，或在 profile 目录写
+`compatibility.json` 授予精确版本豁免（按精确版本对生效，宿主升级后需重新授权）。
 
 ---
 

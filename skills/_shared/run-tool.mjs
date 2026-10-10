@@ -1,19 +1,15 @@
 #!/usr/bin/env node
 /**
- * 技能随附脚本的**通用入口**。
+ * 技能随附脚本的通用入口。
  *
- * 为什么是一个通用入口而不是每个技能各带一份脚本：参数解析踩过两个真实的坑
- * （PowerShell 吃掉命令行双引号、PowerShell 5.1 写 UTF-8 带 BOM），
- * 每个技能复制一份就等于把这两个坑复制十几遍。这里只有一份。
+ * 参数解析集中在这一处，是因为有两个 shell 层面的坑必须统一处理：
+ * PowerShell 会吃掉命令行里的双引号（所以首选 `key=value`），
+ * PowerShell 5.1 的 `Set-Content -Encoding utf8` 会写 BOM（所以读文件时剥离）。
  *
- * 它**不复制任何算法**：直接取插件里那个已测过的工具描述符并调用其 `execute()` ——
- * 参数校验、规范常量、checks/warnings/notes 全部来自同一份实现。所以把能力从工具
- * 列表摘下来（省掉每轮常驻 schema）时，一点正确性都不丢。
+ * 它不复制算法：直接取工具描述符并调用其 `execute()`，参数校验与规范常量都来自同一份实现。
  *
- * 描述符有两个来源：
- *   - `integrate/*.tool.mjs`：导出的 `tool` 对象
- *   - `lib/index.js` 的 `TOOL_FACTORIES`：其余工具的工厂
- * 两者都能在宿主之外调用（见 lib/define-tool.js 的说明）。
+ * 描述符有两个来源：`integrate/*.tool.mjs` 的 `tool` 导出，与 `lib/index.js` 的 `TOOL_FACTORIES`。
+ * 两者都能在宿主之外调用（见 lib/define-tool.js）。
  *
  * 用法（首选 key=value，任何 shell 都安全）：
  *   node run-tool.mjs i2c_bus mode=standard cb_pf=200 vdd_v=3.3
