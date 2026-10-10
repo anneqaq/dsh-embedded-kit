@@ -16,7 +16,7 @@
 
 ## 装了什么
 
-### 工具（模型可调，共 27 个）
+### 工具（模型可调，共 23 个）
 
 #### 体积与构建
 
@@ -61,14 +61,6 @@
 | `sched_analyze` | 调度可行性：CPU 占用率、节拍量化误差、**节拍碰撞扫描**、同拍最坏等待（抖动上界） | 最重一拍能否在一拍内跑完 —— 节拍驱动的生死线 |
 | `fault_decode` | Cortex-M 异常分诊：栈/模式判定、**PC/LR 翻译成「函数 + 偏移」**、CFSR/HFSR/MMFAR/BFAR 解读、按置信度排序的根因推断 | 需要 ELF 提供符号表；单看 `PC=0x08001a3c` 无意义，译成 `Reset_Handler + 0x2c` 才能定位 |
 
-#### 功耗与模拟
-
-| 工具 | 作用 | 关键点 |
-|---|---|---|
-| `power_budget` | 各模式电流加权 → 平均电流与电池寿命 | 常驻漏电单列（"硬地板"，不随占空比下降） |
-| `adc_load` | ADC 采样电荷转移电流 + 源阻抗上限 + 分压/漏电常态负载 | `I = f × C_ADC × Vref × 通道数`，随采样率线性增长；源阻抗超限会让**读数偏低而非线性** |
-| `leak_pin` | 引脚漏电与电平冲突判定 + 电流估算 | 通路由拓扑**确定**；电流需 `vdd` + `pull_ohm`；**取手册的 min 电阻算最坏情况** |
-
 #### 时钟 / 中断 / 看门狗 / 电源
 
 | 工具 | 作用 | 关键点 |
@@ -76,7 +68,6 @@
 | `clock_tree` | PLL **精确命中**的组合求解 + 分频链逐节点校验 + 串口时钟容错预算 | `fout = fsrc/inputDiv×mul/outputDiv`（整数运算）；命中不了就如实报最接近组合与误差——**该误差对 UART 可忽略、对 USB/CAN/I²S 是致命的**；VCO 区间与外设时钟上限必须查手册 |
 | `nvic_priority` | NVIC 优先级分组、抢占判定、中断延迟上界 | **抢占位相同则彼此不能抢占，子优先级不产生抢占**（最常见的误判）；延迟上界 = 最长关中断窗口 + 更高优先级 ISR 之和 + 入栈开销 |
 | `watchdog_check` | 看门狗超时求解、最坏喂狗间隔区间判定、上电路径检查 | 窗口型还要求**不能喂太早**（喂早了同样复位）；判据是**最坏**喂狗间隔而非平均；**不要在中断里喂狗**——那会掩盖主循环卡死 |
-| `power_tree` | LDO/DCDC 逐轨耗散与结温、整树效率、最热轨 | LDO 效率 = Vout/Vin **与电流无关**，压差全变成热（12 V→3.3 V @100 mA 就有 0.87 W）；`Tj=Ta+Pd×Rθja`；`Rθja / Tj_max / η` 必须查手册 |
 
 #### 高速总线与无线
 
@@ -85,7 +76,7 @@
 | `canfd_timing` | CAN FD 两段速率**分开**反算、BRS/CRC 界定符 mixed 位、DLC 非线性映射、CRC17/21 与固定填充位 | **FD 的 DLC 9~15 是非线性映射**（12/16/20/24/32/48/64），只有 16 种合法载荷长度，10 字节这类需求**必须补齐到下一档**；数据段 >1 Mbit/s 必须使能 TDC 且 BRPD 应为 1 或 2 |
 | `lora_airtime` | LoRa 空中时间（Semtech 公式）+ **EU868 占空比合规**、可用发送时长与静默时间 | LDRO 在符号时长 >16 ms 时强制且收发两端必须一致（漏置位时**算出的空时偏小**）；占空比按射频实际在线时间统计，`extra_overhead_sec` 无默认值；**1 s / 100 s 那组限值属 polite spectrum access 路径，与占空比二选一，不是 EU868 通用限值** |
 
-### 技能（写进上下文，`/` 可调，共 16 个）
+### 技能（写进上下文，`/` 可调，共 17 个）
 
 | 技能 | 内容 |
 |---|---|
@@ -105,6 +96,7 @@
 | `link-budget` | 链路预算与闭合：FSPL、扣减明细、余量与达标判定、反推距离、多频段对比。**八个扣减键名与"未计入"清单**、单位必须 SI、拼错的键会被拒绝；`skills/_shared/run-tool.mjs link_budget …` |
 | `usb-bandwidth` | USB 2.0 帧/微帧预算、周期上限与控制保留、高带宽端点、事务开销拆解。含包间延迟无内置实测值、HS 的 bInterval 是 2^(n−1) 微帧、不做 SPLIT 建模会高估；`skills/_shared/run-tool.mjs usb_bandwidth …` |
 | `sdio-speed` | SD/SDIO/eMMC 速率档与有效吞吐、识别阶段限速、降档建议。含每块 18 时钟开销**每根 DAT 线各一份**、四项开销不传即按 0 计（乐观上界）、偏斜/负载上限不给就不判定；`skills/_shared/run-tool.mjs sdio_speed …` |
+| `power-and-io` | 功耗预算与电池寿命、电源树耗散与结温、引脚漏电通路与电平冲突、ADC 采样负载与源阻抗上限。含**待机漏电是硬地板**、LDO 效率与电流无关、最坏情况取手册 min 电阻、源阻抗超限会让读数偏低而非线性；`skills/_shared/run-tool.mjs power_budget \| power_tree \| leak_pin \| adc_load …` |
 
 ---
 
@@ -142,7 +134,7 @@ dsh plugin --profile <profile> add dsh-embedded-kit
 
 本插件挂在 `ctx.on('agent/pre-step')` 上，在**每个会话的第一步**注入一段门禁文本，内容包括
 
-- 一张「要回答什么问题 → 用哪个工具」的对照表（27 个工具全覆盖）
+- 一张「要回答什么问题 → 用哪个工具」的对照表（23 个工具全覆盖）
 - 三条硬约束：**缺数据不许编** / **区分设计值与实测值** / **引用手册章节号前先确认它存在**
 
 目的是让模型**先算再说**，而不是凭印象口算。
@@ -162,12 +154,12 @@ config:
 ```
 
 > **已挂载实测**（dsh 0.2.0-rc.2 + 本包 0.2.0）：门禁文本正常注入会话首步，
-> 27 个工具全部注册（抽查 `proto_frame`，返回的 Modbus RTU 帧与 CRC 正确），
-> 16 个技能进入会话技能目录。
+> 23 个工具全部注册（抽查 `proto_frame`，返回的 Modbus RTU 帧与 CRC 正确），
+> 17 个技能进入会话技能目录。
 >
 > `source.kind` 必须是 producer 自己的标识（`plugin:<包名>`）——v4 明确禁止通配的
 > `plugin` kind，传它会在会话持久化时抛 `SessionFormatError`。
-> 若门禁没出现，可先 `gateEnabled: false` 关掉，不影响 27 个工具与 16 个技能。
+> 若门禁没出现，可先 `gateEnabled: false` 关掉，不影响 23 个工具与 17 个技能。
 
 ### 前置依赖
 
@@ -212,9 +204,9 @@ Cordis 的 `inject` 是硬依赖，一旦声明 `skills` 而当前 profile 没�
 
 ## 验证（已测量）
 
-三个脚本全部通过。**总计 337 项自测 + 0 失败的多格式验证**。
+三个脚本全部通过。**总计 338 项自测 + 0 失败的多格式验证**。
 
-### 自测：337 项全通过
+### 自测：338 项全通过
 
 ```bash
 npm install        # 首次需要：装 vendor/ 下的 @deepseek-ai/dsh-tools / dsh-llm 本地 stub
@@ -226,7 +218,7 @@ node selftest.mjs
 > 裸导入由宿主 profile 的 node_modules 提供真实实现，与本 stub 无关。
 
 不依赖 DSH 进程。其中最关键的几条：
-- **`apply()` 真的被调用**（假 ctx）→ 27 个工具的 `defineTool` schema 合法性被真实验证
+- **`apply()` 真的被调用**（假 ctx）→ 23 个工具的 `defineTool` schema 合法性被真实验证
 - **`import '@deepseek-ai/dsh-tools'` 真的执行** → 裸导入解析路径被真实验证
 - **`fw_size` 对同一文件按 ELF 与按 Keil map 各跑一次** → 自动识别与格式切换被真实验证
 
@@ -361,7 +353,7 @@ ARM Cortex-M0 与 RISC-V RV32 两套工具链的实测结果：`code/ro/rw/zi` *
 dsh-embedded-kit/
 ├── package.json
 ├── lib/                        # 工具与算法模块（38 个文件）
-│   ├── index.js          # 插件入口：name / inject / apply，注册 27 工具 + 16 技能
+│   ├── index.js          # 插件入口：name / inject / apply，注册 23 工具 + 17 技能
 │   ├── gate.js           # 会话启动门禁（pre-step 注入）
 │   ├── skills.js         # SKILL.md 加载与 ctx.skills 注册
 │   # 体积与构建
@@ -417,7 +409,7 @@ dsh-embedded-kit/
 ├── tools/
 │   ├── verify-size.mjs            # 多格式多架构验证（含跨格式互证）
 │   └── verify-real-map.mjs        # 真实 Keil 工程验证
-└── selftest.mjs                   # 337 项自测（不依赖 DSH）
+└── selftest.mjs                   # 338 项自测（不依赖 DSH）
 ```
 
 `testdata/smoke/` 的产物可自行重建（源码与链接脚本都在，两套工具链任一可用即可）。
