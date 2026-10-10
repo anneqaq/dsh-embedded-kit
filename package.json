@@ -1,6 +1,6 @@
 {
   "name": "dsh-embedded-kit",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "芯片与工具链中立的嵌入式固件工具包（32 工具 + 11 技能）。体积与构建：ELF / GNU ld map / Keil map 自动识别的体积分析、七后端构建、Intel HEX 与 Cortex-M 向量表校验、QSPI dummy cycle、栈深度上界。总线与协议：I²C / SPI / I²S / UART·RS-485 / RS-232·422 / LIN / 1-Wire / CAN / CAN-FD / Modbus / SMBus·PMBus。高速与无线：USB 2.0 与 SD·eMMC 带宽、LoRa 空中时间与 EU868 占空比、BLE 吞吐、链路预算。内核侧：时钟树、NVIC 优先级与中断延迟、看门狗、电源树与结温。另有引脚漏电与电平冲突、调度可行性、功耗预算、ADC 采样负载、HardFault 分诊、NVM 磨损寿命、LVGL 缓冲。所有工具区分设计值与实测值，缺数据标 pending 而不编造。",
   "type": "module",
   "main": "lib/index.js",
