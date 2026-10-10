@@ -1,4 +1,4 @@
-# dsh-embedded-kit CI —— 自测 + 多格式验证 + 第 3/4 批探针全量。
+# dsh-embedded-kit CI —— 自测 + 多格式验证 + 模块探针全量。
 #
 # 依赖关系说明：selftest 需要 `@deepseek-ai/dsh-tools` / `@deepseek-ai/dsh-llm`，
 # 由 package.json 的 devDependencies（file:./vendor/* 本地 stub）提供 ——
@@ -42,7 +42,7 @@ jobs:
       - name: 真实 Keil map 自洽验证（包内样本）
         run: node tools/verify-real-map.mjs
 
-      - name: 第 3/4 批模块探针（canfd / pmbus / usb / sdio / lora / ble / linkbudget）
+      - name: 模块探针（canfd / pmbus / usb / sdio / lora / ble / linkbudget）
         run: |
           node probe/canfd.probe.mjs
           node probe/pmbus.probe.mjs

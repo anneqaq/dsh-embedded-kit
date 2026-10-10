@@ -11,7 +11,7 @@
 # 若只是在本地开发、直接挂源码目录（没装进 profile），请改用绝对路径形式：
 #   - insert:
 #       - id: dsh-embedded-kit
-#         name: D:/AiLearn/my-DSH/plugins/dsh-embedded-kit/lib/index.js
+#         name: <仓库绝对路径>/lib/index.js
 
 - insert:
     - id: dsh-embedded-kit

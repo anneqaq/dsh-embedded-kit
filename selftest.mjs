@@ -926,7 +926,7 @@ test('输入漏电流按通道数累加', () => {
 	assert.equal(r.staticLoadUa, 0.4) // 0.05 × 8
 })
 
-console.log('\n== 18. 会话启动门禁（借鉴 dsh-embedded-workbench 的 pre-step 机制） ==')
+console.log('\n== 18. 会话启动门禁（pre-step 注入） ==')
 const gateMod = await import('./lib/gate.js')
 
 // 门禁的定位是**整套工具的使用说明**：每个工具都必须在里面被描述到。
@@ -1840,8 +1840,8 @@ test('电源树：整树合计与最热轨', () => {
 	assert.ok(r.hottestRail !== null)
 })
 
-console.log('\n== 26. 第 3/4 批：并行产出的 7 个模块（沿用各自 integrate/*.cases.mjs） ==')
-// 这 7 个模块由子代理并行产出，用例写在各自的 integrate/<name>.cases.mjs 里，
+console.log('\n== 26. 高速总线与无线模块（用例见各自 integrate/*.cases.mjs） ==')
+// 用例写在各自的 integrate/<name>.cases.mjs 里，
 // 这里只做一次统一注册——避免把上千行断言塞进本文件，也让"模块与它的用例"放在一起。
 const INTEGRATED_MODULES = ['canfd', 'pmbus', 'usb', 'sdio', 'lora', 'ble', 'linkbudget']
 for (const name of INTEGRATED_MODULES) {

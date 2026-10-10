@@ -117,7 +117,7 @@
 ```yaml
 - insert:
     - id: dsh-embedded-kit
-      name: D:/AiLearn/my-DSH/plugins/dsh-embedded-kit/lib/index.js
+      name: /你的仓库绝对路径/dsh-embedded-kit/lib/index.js
 ```
 
 `name` 必须是**绝对路径**（相对路径会静默解析失败，且不报错）。改完重启 dsh 生效。
@@ -147,9 +147,9 @@ dsh plugin --profile <profile> add dsh-embedded-kit
 
 目的是让模型**先算再说**，而不是凭印象口算。
 
-设计上与参考实现的两点刻意差异：
-1. **去重方式**：它扫会话历史事件（依赖会话事件 schema），本实现用按会话对象索引的 `WeakSet` ——
-   少依赖一个未公开结构，行为更可预测。代价：同一会话在新进程里 resume 会再注入一次（无害）。
+两处刻意的设计取舍：
+1. **去重方式**：用按会话对象索引的 `WeakSet`，不依赖未公开的会话事件 schema ——
+   行为更可预测。代价：同一会话在新进程里 resume 会再注入一次（无害）。
 2. **失败降级**：`createUserMessage` 走动态导入，拿不到就**只记日志、不注入**，
    **绝不因为一个可选依赖缺失而让整个插件挂载失败**（本包既有原则）。
 
