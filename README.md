@@ -162,8 +162,9 @@ config:
 ```
 
 > **诚实标注**：门禁的**处理函数契约**（追加消息、按会话去重、reject 透传）与
-> **消息形状**（`text` 内容块 + `source.plugin`）已在自测中用假 ctx 验证；
-> 但**"在真实 dsh 会话里是否被正确消费"未验证** —— 本包尚未挂进 profile。
+> **消息形状**（`text` 内容块 + 会话格式 v4 要求的 `source.kind`）已在自测中用假 ctx 验证。
+> 注意 `source.kind` 必须是 producer 自己的标识（`plugin:<包名>`）——v4 明确禁止通配的
+> `plugin` kind，传它会在会话持久化时抛 `SessionFormatError`。
 > 若挂载后门禁没出现，可先 `gateEnabled: false` 关掉，不影响 32 个工具与 11 个技能。
 
 ### 前置依赖

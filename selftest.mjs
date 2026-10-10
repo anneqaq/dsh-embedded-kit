@@ -997,14 +997,16 @@ test('@deepseek-ai/dsh-llm 可解析且导出 createUserMessage（门禁能否�
 	const llmMod = await import('@deepseek-ai/dsh-llm')
 	assert.equal(typeof llmMod.createUserMessage, 'function')
 })
-test('门禁消息形状：text 内容块 + source 标明来自本插件', async () => {
+test('门禁消息形状：text 内容块 + source.kind 是 producer 自己的标识', async () => {
 	const llmMod = await import('@deepseek-ai/dsh-llm')
 	const msg = gateMod.buildGateMessage(llmMod.createUserMessage, 'hello gate')
 	assert.ok(Array.isArray(msg.content))
 	assert.equal(msg.content[0].type, 'text')
 	assert.equal(msg.content[0].text, 'hello gate')
-	assert.equal(msg.source?.kind, 'plugin')
-	assert.equal(msg.source?.plugin, gateMod.GATE_PLUGIN_ID)
+	assert.equal(msg.source?.kind, `plugin:${gateMod.GATE_PLUGIN_ID}`)
+	// 会话格式 v4 拒绝通配的 `plugin` kind（持久化时抛 SessionFormatError）——不得回归。
+	assert.notEqual(msg.source?.kind, 'plugin')
+	assert.ok(!('plugin' in (msg.source ?? {})), 'v4 形状里没有独立的 plugin 字段')
 })
 test('registerGate 注册成功，且注册进 ctx.on("agent/pre-step")', async () => {
 	const events = []
