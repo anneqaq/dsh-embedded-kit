@@ -359,25 +359,17 @@ export const tool = {
 	name: 'canfd_timing',
 	title: 'CAN FD 位时序与帧结构（两段速率 / BRS 切换 / DLC / CRC 场）',
 	description:
-		'CAN FD 位时序、帧结构与 DLC 换算（口径：ISO 11898-1:2015 / Bosch《CAN with Flexible Data-Rate》V1.0 / CiA《Recommendation for the CAN FD bit-timing》）。' +
-		'三种动作：' +
-		'① action=bit-timing：由控制器时钟与两段目标波特率、采样点，**分别独立**反算仲裁段与数据段的 BRP/TSEG1/TSEG2/SJW 候选（含寄存器编程值 = 功能值 − 1、波特率误差 ppm、振荡器容差、可覆盖的最大单向延迟），并算出 BRS 位（仲裁→数据）与 CRC 界定符位（数据→仲裁）这两个 mixed bit 的时长；' +
-		'② action=frame：由 DLC（或 data_bytes）给出 FD 帧的逐字段位数、每个字段所处的速率段（仲裁段/数据段/mixed）、CRC 变体与 CRC 场的固定填充位数；若同时给了两段波特率与采样点，再估算整帧时长与帧率；' +
-		'③ action=dlc：DLC 与数据场字节数的互查——FD 的 DLC 9~15 是非线性映射（12/16/20/24/32/48/64），只有 16 种合法载荷长度，10 字节这类需求必须补齐到下一档。' +
-		`返回值统一为 { checks, warnings, notes } 加该动作的具体数值（checks 里每项形如 { name, pass, detail }）。` +
-		'硬约束（请如实对待）：' +
-		'（1）**采样点目标、控制器寄存器范围（limits）、TDC 配置本工具不内置任何经验默认值**，必须由调用方给出——缺哪一项就在 warnings/notes 里点名，而不是替你猜一个"常见值"；' +
-		'（2）上面所有数字都是**设计值**。实际位宽、采样点位置、边沿抖动必须用示波器同时探 CAN_H/CAN_L 与 TXD/RXD 实测；数据段的相位裕量 PM1/PM2 需要实测的位不对称量 A1/A2 按 CiA 601-3 的方法算，本工具**不重算相位裕量**，也不给"看起来合理"的拓扑经验值；' +
-		'（3）数据段波特率 > 1 Mbit/s 时，按 CiA Rec.6 引 ISO 11898-1:2015 **必须使能 TDC 且 BRPD 应为 1 或 2**，未使能会报出具体后果（采样点读到上一位 → 误报位错误 → 触发错误帧）；' +
-		'（4）两段采样点互相独立，协议不要求相等。本工具不把"谁大谁小"当 pass/fail，只在数据段采样点晚于仲裁段时给一条 warning，提醒必须用实测 A1/A2 论证。',
+		'CAN FD 位时序、帧结构与 DLC 换算（ISO 11898-1:2015 / Bosch V1.0 / CiA Rec.6）。三个动作：' +
+		'bit-timing 两段速率**分别**反算 BRP/TSEG1/TSEG2/SJW 并算 BRS 与 CRC 界定符两个 mixed 位时长；' +
+		'frame 给逐字段位数、速率段、CRC 变体与固定填充位；dlc 做 DLC 与字节数互查（**9~15 是非线性映射**，只有 16 种合法载荷长度）。' +
+		'**采样点目标、寄存器范围 limits、TDC 配置都无内置默认值**，缺哪项就点名。数据段 > 1 Mbit/s 必须使能 TDC 且 BRPD 为 1 或 2。' +
+		'相位裕量口径与实测要求见 bus-timing 技能。',
 	parameters: {
 		action: {
 			type: 'string',
 			required: true,
 			enum: ACTIONS,
-			description:
-				'bit-timing=两段位时序反算 + BRS 切换 + TDC 判定（需 clock_hz 与两段波特率、采样点）；' +
-				'frame=帧结构（需 dlc 或 data_bytes，可选两段速率以算整帧时长）；dlc=DLC 与字节数互查。',
+			description: 'bit-timing=两段位时序反算 + BRS 切换 + TDC 判定；frame=帧结构；dlc=DLC 与字节数互查。',
 		},
 		clock_hz: {
 			type: 'integer',
@@ -393,13 +385,11 @@ export const tool = {
 		},
 		arbitration_sample_point: {
 			type: 'number',
-			description:
-				'仲裁段采样点目标（0~1 的比例，如 0.8 表示 80%）。**必填，无默认值**：这是网络上所有节点必须一致的公共约定，也是与 OEM 规范对齐的设计决策。',
+			description: '仲裁段采样点目标（0~1 比例，如 0.8 表示 80%）。**必填无默认值**：全网节点必须一致的公共约定。',
 		},
 		data_sample_point: {
 			type: 'number',
-			description:
-				'数据段采样点目标（0~1 的比例）。**必填，无默认值**：必须用实测的位不对称量 A1/A2 论证，不是照搬仲裁段。',
+			description: '数据段采样点目标（0~1 比例）。**必填无默认值**，必须用实测 A1/A2 论证，不是照搬仲裁段。',
 		},
 		dlc: { type: 'integer', description: 'DLC 值 0~15（4 位字段）。action=frame / action=dlc 与 data_bytes 二选一。' },
 		data_bytes: {
@@ -409,25 +399,22 @@ export const tool = {
 		},
 		fd: {
 			type: 'boolean',
-			description:
-				'仅 action=dlc 有效：true（默认）按 CAN FD 映射，false 按经典 CAN 映射（DLC 9~15 一律 8 字节）。action=frame 固定按 CAN FD，传 false 会报错。',
+			description: '仅 action=dlc 有效：true（默认）按 FD 映射，false 按经典 CAN（DLC 9~15 一律 8 字节）。action=frame 固定按 FD，传 false 报错。',
 		},
 		extended: { type: 'boolean', description: '是否扩展格式（29 位标识符，FEFF）。默认 false（标准格式，11 位 ID）。仅 action=frame 有效。' },
 		dynamic_stuff_bits: {
 			type: 'integer',
-			description:
-				'action=frame 时计入的动态填充位个数，默认 0（理想无填充）。FD 帧的动态填充止于数据场结束（CRC 场改用固定填充位），最坏值 = floor((动态填充区位数 − 1) / 4)，实际值取决于数据内容。超过最坏值会报警。',
+			description: 'action=frame 计入的动态填充位个数，默认 0。最坏值 = floor((动态填充区位数 − 1) / 4)；超过最坏值会报警。',
 		},
 		limits: {
 			type: 'array',
 			description:
-				'控制器位时序寄存器范围，每项形如 { name, value }，name 取 brpMin / brpMax / tseg1TqMax / tseg2TqMax / sjwTqMax / nbtMin / nbtMax。' +
-				'**必须查芯片手册填入**（本工具不内置经验值）；不给就只按"能整除"枚举，结果可能超出你手上芯片的可写范围，warnings 里会点名。仅 action=bit-timing 有效。',
+				'控制器位时序寄存器范围，每项 { name, value }，name 取 brpMin / brpMax / tseg1TqMax / tseg2TqMax / sjwTqMax / nbtMin / nbtMax。' +
+				'**必须查芯片手册**；不给就只按"能整除"枚举，结果可能超出芯片可写范围。',
 		},
 		tdc_enabled: {
 			type: 'boolean',
-			description:
-				'是否使能发送延迟补偿（TDC）。给了这个键才做 TDC 判定；不给则 notes 里点名"未提供 tdc 配置"。数据段 > 1 Mbit/s 时按 CiA Rec.6 要求必须为 true。',
+			description: '是否使能 TDC。给了才做 TDC 判定；数据段 > 1 Mbit/s 时必须为 true（CiA Rec.6）。',
 		},
 		tdc_data_brp: { type: 'integer', description: 'TDC 使能时数据段 BRP 功能值；不为 1 或 2 时会报警（CiA Rec.6 引 ISO 11898-1:2015）。' },
 		ssp_offset_tq: {
